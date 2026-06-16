@@ -1,0 +1,97 @@
+<%- include('partials/header') %>
+
+<div class="container py-5">
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4">
+    <div>
+      <h1 class="h3 mb-1">My Homework</h1>
+      <p class="text-muted mb-0">Grade <strong><%= grade %></strong> • View and submit homework assignments</p>
+    </div>
+    <a href="/learner" class="btn btn-outline-secondary btn-sm">Back to Dashboard</a>
+  </div>
+
+  <div class="row gy-3">
+    <% if (homeworkList.length === 0) { %>
+      <div class="col-12">
+        <div class="alert alert-info mb-0">
+          <i class="fas fa-info-circle me-2"></i>
+          <strong>No homework assigned yet.</strong> Your teachers will post assignments here.
+        </div>
+      </div>
+    <% } else { %>
+      <% homeworkList.forEach(hw => { %>
+        <div class="col-12">
+          <div class="card shadow-sm border-0 h-100">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-start mb-3">
+                <div>
+                  <h5 class="card-title mb-1">
+                    <% if (hw.subject) { %>
+                      <span class="badge bg-primary me-2"><%= hw.subject.charAt(0).toUpperCase() + hw.subject.slice(1) %></span>
+                    <% } %>
+                    Homework Assignment
+                  </h5>
+                  <p class="text-muted mb-0 small">
+                    Posted by <strong><%= hw.teacher_name %></strong> on 
+                    <%= new Date(hw.created_at).toLocaleDateString() %>
+                  </p>
+                </div>
+                <% if (hw.submission_id) { %>
+                  <span class="badge bg-success">
+                    <i class="fas fa-check-circle me-1"></i>Submitted
+                  </span>
+                <% } else { %>
+                  <span class="badge bg-warning">
+                    <i class="fas fa-hourglass-half me-1"></i>Pending
+                  </span>
+                <% } %>
+              </div>
+
+              <% if (hw.task_description) { %>
+                <div class="mb-3 p-3 bg-light rounded">
+                  <p class="mb-0"><%= hw.task_description %></p>
+                </div>
+              <% } %>
+
+              <div class="d-grid gap-2 d-md-flex align-items-center flex-wrap">
+                <a href="/learner/homework/<%= hw.id %>" class="btn btn-sm btn-primary w-100 w-md-auto">
+                  <i class="fas fa-eye me-1"></i>View & Submit
+                </a>
+
+                <% if (hw.document_path) { %>
+                  <a href="/<%= hw.document_path %>" class="btn btn-sm btn-outline-secondary w-100 w-md-auto" download>
+                    <i class="fas fa-download me-1"></i>Download Task
+                  </a>
+                <% } %>
+
+                <% if (hw.submission_id && (hw.teacher_feedback || hw.teacher_score !== null)) { %>
+                  <button class="btn btn-sm btn-outline-info w-100 w-md-auto" data-bs-toggle="collapse" data-bs-target="#feedback-<%= hw.id %>">
+                    <i class="fas fa-comment me-1"></i>Feedback
+                  </button>
+                <% } %>
+              </div>
+
+              <% if (hw.submission_id && (hw.teacher_feedback || hw.teacher_score !== null)) { %>
+                <div class="collapse mt-3" id="feedback-<%= hw.id %>">
+                  <div class="card card-body bg-light">
+                    <h6 class="fw-semibold mb-2">Teacher Feedback</h6>
+                    <% if (hw.teacher_score !== null) { %>
+                      <p class="mb-1"><strong>Score:</strong> <%= hw.teacher_score %>%</p>
+                    <% } %>
+                    <% if (hw.teacher_feedback) { %>
+                      <p class="mb-0"><%= hw.teacher_feedback %></p>
+                    <% } %>
+                    <small class="text-muted mt-2">
+                      Feedback received on <%= new Date(hw.feedback_at).toLocaleDateString() %>
+                    </small>
+                  </div>
+                </div>
+              <% } %>
+            </div>
+          </div>
+        </div>
+      <% }) %>
+    <% } %>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

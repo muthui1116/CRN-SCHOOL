@@ -1,0 +1,62 @@
+<% title = "Teachers"; %>
+<div class="row">
+  <div class="col-12 col-sm-12">
+    <div class="card shadow-sm border-0">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+          <h3 class="mb-1">Teachers</h3>
+          <p class="mb-0 text-muted">View your teaching staff and manage department assignments from a streamlined dashboard.</p>
+        </div>
+        <div class="d-flex gap-2 flex-wrap align-items-center">
+          <a href="/teachers" class="btn btn-sm btn-outline-secondary">Refresh</a>
+          <a href="/teachers/add" class="btn btn-sm btn-primary">Add Teacher</a>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive rounded-3 shadow-sm">
+          <table class="table table-striped table-hover table-sm align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>ID</th>
+              <th>Name</th>
+              <th>TSC No</th>
+              <th>Grade</th>
+              <th>Subject Combination</th>
+              <th>Department</th>
+              <th>Responsibility</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (!(teachers||[]).length) { %>
+              <tr>
+                <td colspan="8" class="text-center text-muted py-4">No teachers found. Add a teacher to get started.</td>
+              </tr>
+            <% } else { %>
+              <% (teachers||[]).forEach(t => { %>
+              <tr>
+                <td><%= t.id %></td>
+                <td><%= t.name || 'N/A' %></td>
+                <td><%= t.tsc_no || 'N/A' %></td>
+                <td><%= t.grade || 'N/A' %></td>
+                <td><%= t.subject_combination || 'N/A' %></td>
+                <td><%= t.department || 'N/A' %></td>
+                <td><%= t.responsibility || 'N/A' %></td>
+                <td class="table-actions">
+                  <div class="d-flex gap-1 flex-wrap">
+                    <a href="/teachers/<%= t.id %>/edit" class="btn btn-sm btn-warning">Edit</a>
+                    <form action="/teachers/delete/<%= t.id %>" method="POST" class="m-0">
+                      <button class="btn btn-sm btn-danger" onclick="return confirm('Delete this teacher?')">Delete</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+              <% }) %>
+            <% } %>
+          </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

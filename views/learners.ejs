@@ -1,0 +1,62 @@
+<% title = "Learners"; %>
+<div class="row">
+  <div class="col-12 col-sm-12">
+    <div class="card shadow-sm border-0">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+          <h3 class="mb-1">Learners</h3>
+          <p class="mb-0 text-muted">Browse and manage your learner roster with fast edit and delete actions.</p>
+        </div>
+        <div class="d-flex gap-2 flex-wrap align-items-center">
+          <a href="/learners" class="btn btn-sm btn-outline-secondary">Refresh</a>
+          <a href="/learners/add" class="btn btn-sm btn-primary">Add Learner</a>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive rounded-3 shadow-sm">
+          <table class="table table-striped table-hover table-sm align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Assessment #</th>
+                <th>Birth Certificate</th>
+                <th>Grade</th>
+                <th>Class Teacher</th>
+                <th>Responsibility</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (!(learners||[]).length) { %>
+                <tr>
+                  <td colspan="8" class="text-center text-muted py-4">No learners found. Add a learner to begin.</td>
+                </tr>
+              <% } else { %>
+                <% (learners||[]).forEach(l => { %>
+                  <tr>
+                    <td><%= l.id %></td>
+                    <td><%= l.name || 'N/A' %></td>
+                    <td><%= l.assessment_number || 'N/A' %></td>
+                    <td><%= l.birth_certificate || 'N/A' %></td>
+                    <td><%= l.grade || 'N/A' %></td>
+                    <td><%= l.class_teacher || 'N/A' %></td>
+                    <td><%= l.responsibility || 'N/A' %></td>
+                    <td class="table-actions">
+                      <div class="d-flex gap-1 flex-wrap">
+                        <a href="/learners/<%= l.id %>/edit" class="btn btn-sm btn-warning">Edit</a>
+                        <form action="/learners/delete/<%= l.id %>" method="POST" class="m-0">
+                          <button class="btn btn-sm btn-danger" onclick="return confirm('Delete this learner?')">Delete</button>
+                        </form>
+                      </div>
+                    </td>
+                  </tr>
+                <% }) %>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

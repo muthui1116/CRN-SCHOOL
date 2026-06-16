@@ -1,0 +1,824 @@
+<%- include('partials/header') %>
+
+<div class="container py-5">
+  <div class="row">
+    <!-- Sidebar Navigation -->
+    <div class="col-lg-3 mb-4">
+      <div class="card shadow-sm sticky-top" style="top: 100px;">
+        <div class="card-body text-center">
+          <!-- Profile Image -->
+          <div class="col-md-6 text-center">
+  <label class="form-label text-muted small d-block mb-2">Current Image:</label>
+  <div id="currentImagePreview" class="rounded border border-2 mx-auto" style="width: 100px; height: 100px; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); display: flex; align-items: center; justify-content: center; overflow: hidden;">
+    <% if (userProfile.profile_image) { %>
+        <img src="<%= userProfile.profile_image %>" style="width: 100%; height: 100%; object-fit: cover;" alt="Profile">
+    <% } else { %>
+        <i class="fas fa-image text-white" style="font-size: 2rem;"></i>
+    <% } %>
+  </div>
+
+  <button type="button" class="btn btn-sm btn-outline-danger mt-2" id="removeImageBtn">
+    <i class="fas fa-trash-alt"></i> Remove
+  </button>
+ 
+  <input type="hidden" id="removeImageFlag" value="false">
+</div>
+
+          <!-- User Info -->
+          <h5 class="mb-1"><%= user.email ? user.email.split('@')[0] : 'User' %></h5>
+          <p class="text-muted small mb-3"><%= userProfile && userProfile.email ? userProfile.email : '' %></p>
+
+          <!-- Account Age -->
+          <div class="mb-3 p-3 bg-light rounded">
+            <small class="text-muted d-block mb-2">
+              <i class="fas fa-calendar-alt"></i> Member since
+            </small>
+            <small class="fw-semibold">
+              <% 
+                let memberDateObj = null;
+                try {
+                  if (userProfile && userProfile.date_created) {
+                    memberDateObj = new Date(userProfile.date_created);
+                    if (isNaN(memberDateObj.getTime())) {
+                      memberDateObj = null;
+                    }
+                  }
+                } catch (e) {
+                  memberDateObj = null;
+                }
+                
+                const displayMemberDate = memberDateObj ? memberDateObj.toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric'
+                }) : 'N/A';
+              %>
+              <%= displayMemberDate %>
+            </small>
+          </div>
+
+          <% if (user && user.role === 1) { %>
+            <span class="badge bg-warning text-dark mb-3 d-block">
+              <i class="fas fa-crown"></i> Manager Account
+            </span>
+          <% } %>
+
+          <div class="d-grid gap-2">
+            <a href="/" class="btn btn-sm btn-outline-primary">
+              <i class="fas fa-shopping-bag"></i> Continue Shopping
+            </a>
+            <a href="/my-orders" class="btn btn-sm btn-outline-secondary">
+              <i class="fas fa-history"></i> Order History
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="col-lg-9">
+      <!-- Alert Container -->
+      <div id="alertContainer" role="region" aria-live="polite"></div>
+
+      <!-- Nav Tabs -->
+      <ul class="nav nav-tabs mb-4" id="profileTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active" id="account-tab" data-bs-toggle="tab" data-bs-target="#account-content" type="button" role="tab" aria-controls="account-content" aria-selected="true">
+            <i class="fas fa-user"></i> Account Information
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="security-tab" data-bs-toggle="tab" data-bs-target="#security-content" type="button" role="tab" aria-controls="security-content" aria-selected="false">
+            <i class="fas fa-lock"></i> Security
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="danger-tab" data-bs-toggle="tab" data-bs-target="#danger-content" type="button" role="tab" aria-controls="danger-content" aria-selected="false">
+            <i class="fas fa-exclamation-triangle"></i> Danger Zone
+          </button>
+        </li>
+      </ul>
+
+      <!-- Tab Content -->
+      <div class="tab-content" id="profileTabContent">
+        <!-- Account Information Tab -->
+        <div class="tab-pane fade show active" id="account-content" role="tabpanel" aria-labelledby="account-tab">
+          <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white">
+              <h5 class="mb-0">
+                <i class="fas fa-info-circle"></i> Account Details
+              </h5>
+            </div>
+            <div class="card-body">
+              <div class="row mb-3">
+                <div class="col-md-6">
+                  <label class="form-label text-muted small">Account Created</label>
+                  <p class="fw-semibold">
+                    <% 
+                      let createdDateObj = null;
+                      try {
+                        if (userProfile && userProfile.date_created) {
+                          createdDateObj = new Date(userProfile.date_created);
+                          if (isNaN(createdDateObj.getTime())) {
+                            createdDateObj = null;
+                          }
+                        }
+                      } catch (e) {
+                        createdDateObj = null;
+                      }
+                      
+                      const displayCreatedDate = createdDateObj ? createdDateObj.toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: true
+                      }) : 'N/A';
+                    %>
+                    <%= displayCreatedDate %>
+                  </p>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label text-muted small">Last Updated</label>
+                  <p class="fw-semibold">
+                    <% 
+                      let updatedDateObj = null;
+                      try {
+                        if (userProfile && userProfile.updated_at) {
+                          updatedDateObj = new Date(userProfile.updated_at);
+                          if (isNaN(updatedDateObj.getTime())) {
+                            updatedDateObj = null;
+                          }
+                        }
+                      } catch (e) {
+                        updatedDateObj = null;
+                      }
+                      
+                      const displayUpdatedDate = updatedDateObj ? updatedDateObj.toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: true
+                      }) : 'N/A';
+                    %>
+                    <%= displayUpdatedDate %>
+                  </p>
+                </div>
+              </div>
+              <hr>
+              <div class="row">
+                <div class="col-md-6">
+                  <label class="form-label text-muted small">Account Status</label>
+                  <p class="fw-semibold">
+                    <span class="badge bg-success">
+                      <i class="fas fa-check-circle"></i> Active
+                    </span>
+                  </p>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label text-muted small">User Type</label>
+                  <p class="fw-semibold">
+                    <% if (user && user.role === 1) { %>
+                      <span class="badge bg-warning text-dark">Manager</span>
+                    <% } else { %>
+                      <span class="badge bg-secondary">Customer</span>
+                    <% } %>
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Edit Profile Card -->
+          <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+              <h5 class="mb-0">
+                <i class="fas fa-edit"></i> Edit Profile
+              </h5>
+            </div>
+            <div class="card-body">
+              <form id="editProfileForm">
+                <!-- Profile Image Upload Section -->
+                <div class="mb-4">
+                  <label class="form-label fw-bold">
+                    <i class="fas fa-image"></i> Profile Picture
+                  </label>
+                  <div class="row">
+                    <div class="col-md-6">
+                      <div class="border-2 border-dashed rounded p-4 text-center" id="imageUploadArea" style="cursor: pointer; background-color: #f8f9fa; transition: all 0.3s;">
+                        <i class="fas fa-cloud-upload-alt" style="font-size: 2.5rem; color: #007bff; margin-bottom: 10px;"></i>
+                        <p class="mb-2 fw-semibold">Click to upload or drag image</p>
+                        <small class="text-muted d-block">PNG, JPG, WebP (Max 5MB)</small>
+                        <input type="file" id="profileImageInput" name="profile_image" accept="image/png,image/jpeg,image/jpg,image/webp" style="display: none;">
+                      </div>
+                      <small class="text-muted d-block mt-2" id="imageFileName"></small>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label text-muted small d-block mb-2 text-center">Current Image:</label>
+                      <div id="currentImagePreview" class="rounded border border-2 mx-auto" style="width: 100px; height: 100px; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                        <% if (userProfile && userProfile.profile_image) { %>
+                          <img src="<%= userProfile.profile_image %>" style="width: 100%; height: 100%; object-fit: cover;" alt="Profile">
+                        <% } else { %>
+                          <i class="fas fa-image text-white" style="font-size: 2rem;"></i>
+                        <% } %>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <hr class="my-4">
+
+                <!-- Email Section -->
+                <div class="mb-4">
+                  <label for="email" class="form-label fw-bold">
+                    <i class="fas fa-envelope"></i> Email Address
+                  </label>
+                  <div class="input-group">
+                    <input 
+                      type="email" 
+                      class="form-control" 
+                      id="email" 
+                      name="email" 
+                      value="<%= userProfile && userProfile.email ? userProfile.email : '' %>" 
+                      placeholder="your@email.com"
+                      required
+                    >
+                    <button type="button" class="btn btn-outline-secondary" id="emailEditBtn" title="Edit Email">
+                      <i class="fas fa-edit"></i>
+                    </button>
+                  </div>
+                  <small class="text-muted d-block mt-2">We'll never share your email. Changing your email may require verification.</small>
+                  <div id="emailStatus"></div>
+                </div>
+
+                <!-- Phone Section -->
+                <div class="mb-4">
+                  <label for="phone" class="form-label fw-bold">
+                    <i class="fas fa-phone"></i> Phone Number
+                  </label>
+                  <div class="input-group">
+                    <input 
+                      type="tel" 
+                      class="form-control" 
+                      id="phone" 
+                      name="phone" 
+                      value="<%= userProfile && userProfile.phone ? userProfile.phone : '' %>" 
+                      placeholder="+254XXXXXXXXX"
+                    >
+                    <button type="button" class="btn btn-outline-secondary" id="phoneEditBtn" title="Edit Phone">
+                      <i class="fas fa-edit"></i>
+                    </button>
+                  </div>
+                  <small class="text-muted d-block mt-2">Format: +254XXXXXXXXX or similar</small>
+                  <div id="phoneStatus"></div>
+                </div>
+
+                <hr class="my-4">
+
+                <!-- Submit Section -->
+                <div class="d-grid gap-2">
+                  <button type="submit" class="btn btn-primary btn-lg" id="updateProfileBtn">
+                    <i class="fas fa-save"></i> Save All Changes
+                  </button>
+                  <button type="reset" class="btn btn-secondary" id="resetProfileBtn">
+                    <i class="fas fa-undo"></i> Reset Form
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <!-- Security Tab -->
+<div class="tab-pane fade" id="security-content" role="tabpanel" aria-labelledby="security-tab">
+  <div class="card shadow-sm">
+    <div class="card-header bg-warning text-dark">
+      <h5 class="mb-0">
+        <i class="fas fa-lock"></i> Change Password
+      </h5>
+    </div>
+    <div class="card-body">
+      <form id="changePasswordForm">
+        <div class="alert alert-info mb-4" role="alert">
+          <i class="fas fa-info-circle"></i> Password must be at least 6 characters long and different from your current password.
+        </div>
+
+        <div class="row mb-3">
+          <div class="col-md-6">
+            <label for="current_password" class="form-label fw-bold">Current Password</label>
+            <input type="password" class="form-control" id="current_password" name="current_password" placeholder="Enter current password" required>
+            <!-- ✅ NEW: Forgot password link -->
+            <div class="mt-2">
+              <a href="/forgot-password" class="text-muted small">
+                <i class="fas fa-question-circle"></i> Forgot your password?
+              </a>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label for="password_strength" class="form-label fw-bold">Password Strength</label>
+            <div class="d-flex align-items-center gap-2">
+              <div class="progress flex-grow-1" style="height: 8px;">
+                <div id="passwordStrengthBar" class="progress-bar" role="progressbar" style="width: 0%"></div>
+              </div>
+              <small id="passwordStrengthText" class="text-muted">-</small>
+            </div>
+          </div>
+        </div>
+
+        <div class="row mb-3">
+          <div class="col-md-6">
+            <label for="new_password" class="form-label fw-bold">New Password</label>
+            <input type="password" class="form-control" id="new_password" name="new_password" placeholder="Enter new password" required>
+          </div>
+          <div class="col-md-6">
+            <label for="confirm_password" class="form-label fw-bold">Confirm Password</label>
+            <input type="password" class="form-control" id="confirm_password" name="confirm_password" placeholder="Confirm new password" required>
+            <small id="passwordMatchText" class="text-muted d-block mt-1"></small>
+          </div>
+        </div>
+
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-warning" id="changePasswordBtn">
+            <i class="fas fa-key"></i> Update Password
+          </button>
+          <button type="reset" class="btn btn-secondary">
+            <i class="fas fa-undo"></i> Clear
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+        <!-- Danger Zone Tab -->
+        <div class="tab-pane fade" id="danger-content" role="tabpanel" aria-labelledby="danger-tab">
+          <div class="card shadow-sm border-danger">
+            <div class="card-header bg-danger text-white">
+              <h5 class="mb-0">
+                <i class="fas fa-exclamation-triangle"></i> Delete Account
+              </h5>
+            </div>
+            <div class="card-body">
+              <div class="alert alert-danger mb-4" role="alert">
+                <strong><i class="fas fa-exclamation-circle"></i> Warning!</strong> This action is permanent and cannot be undone. All your data including orders and products will be permanently deleted.
+              </div>
+
+              <button type="button" class="btn btn-danger btn-lg" id="deleteAccountBtn" data-bs-toggle="modal" data-bs-target="#deleteAccountModal">
+                <i class="fas fa-trash-alt"></i> Delete My Account
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Account Modal -->
+<div class="modal fade" id="deleteAccountModal" tabindex="-1" aria-labelledby="deleteAccountModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content border-danger">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title" id="deleteAccountModalLabel">
+          <i class="fas fa-exclamation-circle"></i> Confirm Account Deletion
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-danger" role="alert">
+          <strong>This action cannot be reversed!</strong>
+          <p class="mb-0 mt-2">Deleting your account will:</p>
+          <ul class="mb-0 mt-2">
+            <li>Remove all your personal information</li>
+            <li>Delete all your orders and order history</li>
+            <li>Remove all your products listings</li>
+            <li>Cancel any active operations</li>
+          </ul>
+        </div>
+
+        <form id="deleteAccountForm">
+          <div class="mb-3">
+            <label for="deleteEmail" class="form-label fw-bold">Enter your email to confirm:</label>
+            <input type="email" class="form-control" id="deleteEmail" placeholder="<%= userProfile && userProfile.email ? userProfile.email : '' %>" required>
+            <small class="text-muted">Must match your account email</small>
+          </div>
+
+          <div class="mb-3">
+            <label for="deleteConfirmation" class="form-label fw-bold">Type this exactly: <code>DELETE MY ACCOUNT</code></label>
+            <input type="text" class="form-control" id="deleteConfirmation" placeholder="DELETE MY ACCOUNT" required>
+            <small class="text-muted">Case-sensitive confirmation text</small>
+          </div>
+
+          <div class="mb-3">
+            <label for="deletePassword" class="form-label fw-bold">Enter your password to confirm:</label>
+            <input type="password" class="form-control" id="deletePassword" placeholder="Password" required>
+          </div>
+
+          <div class="mb-3 p-3 bg-light rounded">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="deleteCheckbox" required>
+              <label class="form-check-label" for="deleteCheckbox">
+                I understand that this action is permanent and all my data will be deleted
+              </label>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer bg-light">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+          <i class="fas fa-trash-alt"></i> Delete Account Permanently
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .card {
+    border: 1px solid #e9ecef;
+    transition: all 0.3s ease;
+  }
+
+  .card:hover {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+  }
+
+  .form-control:focus,
+  .form-select:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+  }
+
+  .nav-tabs .nav-link {
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: #666;
+    transition: all 0.3s ease;
+  }
+
+  .nav-tabs .nav-link:hover {
+    border-bottom-color: #007bff;
+  }
+
+  .nav-tabs .nav-link.active {
+    border-bottom-color: #007bff;
+    color: #007bff;
+    background-color: transparent;
+  }
+
+  #imageUploadArea:hover {
+    border-color: #007bff !important;
+    background-color: #e7f1ff !important;
+  }
+
+  #imageUploadArea.drag-over {
+    border-color: #007bff !important;
+    background-color: #e7f1ff;
+    box-shadow: 0 0 10px rgba(0, 123, 255, 0.2);
+  }
+
+  .progress {
+    background-color: #e9ecef;
+  }
+
+  @media (max-width: 768px) {
+    .sticky-top {
+      position: relative !important;
+      top: auto !important;
+    }
+
+    .nav-tabs {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+    }
+  }
+</style>
+
+<script>
+  let selectedImageFile = null;
+
+  document.addEventListener('DOMContentLoaded', function() {
+    initializeProfilePage();
+  });
+
+function initializeProfilePage() {
+  // Image upload
+  const profileImageInput = document.getElementById('profileImageInput');
+  const imageUploadArea = document.getElementById('imageUploadArea');
+
+  imageUploadArea.addEventListener('click', () => profileImageInput.click());
+  profileImageInput.addEventListener('change', handleImageSelect);
+
+  // Drag and drop
+  imageUploadArea.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    imageUploadArea.classList.add('drag-over');
+  });
+
+  imageUploadArea.addEventListener('dragleave', () => {
+    imageUploadArea.classList.remove('drag-over');
+  });
+
+  imageUploadArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    imageUploadArea.classList.remove('drag-over');
+    if (e.dataTransfer.files.length > 0) {
+      profileImageInput.files = e.dataTransfer.files;
+      handleImageSelect();
+    }
+  });
+
+  // Remove image button
+  const removeBtn = document.getElementById('removeImageBtn');
+  if (removeBtn) {
+    removeBtn.addEventListener('click', handleImageRemove);
+  }
+
+  // Form submissions
+  document.getElementById('editProfileForm').addEventListener('submit', updateProfile);
+  document.getElementById('changePasswordForm').addEventListener('submit', changePassword);
+  document.getElementById('confirmDeleteBtn').addEventListener('click', deleteAccount);
+
+  // Password strength indicator
+  document.getElementById('new_password').addEventListener('input', checkPasswordStrength);
+  document.getElementById('confirm_password').addEventListener('input', checkPasswordMatch);
+}
+
+  function handleImageSelect() {
+  const input = document.getElementById('profileImageInput');
+  const file = input.files[0];
+
+  if (!file) return;
+
+  const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+  if (!validTypes.includes(file.type)) {
+    showAlert('Invalid image format. Only PNG, JPG, and WebP are allowed', 'danger');
+    input.value = '';
+    return;
+  }
+
+  if (file.size > 5 * 1024 * 1024) {
+    showAlert('Image size exceeds 5MB limit', 'danger');
+    input.value = '';
+    return;
+  }
+
+  selectedImageFile = file;
+  document.getElementById('imageFileName').textContent = `Selected: ${file.name}`;
+
+  // Reset removal flag in case user had previously clicked remove
+  document.getElementById('removeImageFlag').value = 'false';
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    // Update ALL #currentImagePreview elements (sidebar + form)
+    document.querySelectorAll('#currentImagePreview').forEach(el => {
+      el.innerHTML = `<img src="${e.target.result}" style="width: 100%; height: 100%; object-fit: cover;">`;
+    });
+
+    // Show the remove button again if it was hidden
+    const removeBtn = document.getElementById('removeImageBtn');
+    if (removeBtn) removeBtn.style.display = '';
+  };
+  reader.readAsDataURL(file);
+}
+
+function handleImageRemove() {
+  selectedImageFile = null;
+  document.getElementById('profileImageInput').value = '';
+  document.getElementById('imageFileName').textContent = '';
+  document.getElementById('removeImageFlag').value = 'true';
+
+  // Clear ALL #currentImagePreview elements instantly
+  document.querySelectorAll('#currentImagePreview').forEach(el => {
+    el.innerHTML = `<i class="fas fa-image text-white" style="font-size: 2rem;"></i>`;
+  });
+
+  const removeBtn = document.getElementById('removeImageBtn');
+  if (removeBtn) removeBtn.style.display = 'none';
+
+  showAlert('Profile picture will be removed when you save.', 'info');
+}
+
+  function checkPasswordStrength() {
+    const password = document.getElementById('new_password').value;
+    const strengthBar = document.getElementById('passwordStrengthBar');
+    const strengthText = document.getElementById('passwordStrengthText');
+
+    let strength = 0;
+    if (password.length >= 6) strength += 25;
+    if (password.length >= 8) strength += 25;
+    if (/[A-Z]/.test(password)) strength += 25;
+    if (/[0-9!@#$%^&*]/.test(password)) strength += 25;
+
+    strengthBar.style.width = strength + '%';
+    strengthBar.className = 'progress-bar ' + (strength < 50 ? 'bg-danger' : strength < 75 ? 'bg-warning' : 'bg-success');
+    strengthText.textContent = strength < 50 ? 'Weak' : strength < 75 ? 'Fair' : 'Strong';
+  }
+
+  function checkPasswordMatch() {
+    const new_password = document.getElementById('new_password').value;
+    const confirm_password = document.getElementById('confirm_password').value;
+    const matchText = document.getElementById('passwordMatchText');
+
+    if (!confirm_password) {
+      matchText.textContent = '';
+      return;
+    }
+
+    if (new_password === confirm_password) {
+      matchText.textContent = '✓ Passwords match';
+      matchText.className = 'text-success';
+    } else {
+      matchText.textContent = '✗ Passwords do not match';
+      matchText.className = 'text-danger';
+    }
+  }
+
+  async function updateProfile(e) {
+  e.preventDefault();
+
+  const formData = new FormData();
+  formData.append('email', document.getElementById('email').value);
+  formData.append('phone', document.getElementById('phone').value);
+  formData.append('remove_image', document.getElementById('removeImageFlag').value);
+
+  if (selectedImageFile) {
+    formData.append('profile_image', selectedImageFile);
+  }
+
+  const btn = document.getElementById('updateProfileBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
+
+  try {
+    const response = await fetch('/profile/update', {
+      method: 'POST',
+      body: formData
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
+      showAlert('Profile updated successfully!', 'success');
+      selectedImageFile = null;
+      document.getElementById('imageFileName').textContent = '';
+      // Reset the removal flag after a successful save
+      document.getElementById('removeImageFlag').value = 'false';
+    } else {
+      showAlert(data.error, 'danger');
+    }
+  } catch (err) {
+    showAlert('Error updating profile: ' + err.message, 'danger');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-save"></i> Save All Changes';
+  }
+}
+
+ async function changePassword(e) {
+    e.preventDefault();
+
+    const new_password = document.getElementById('new_password').value;
+    const confirm_password = document.getElementById('confirm_password').value;
+
+    if (new_password !== confirm_password) {
+      showAlert('Passwords do not match', 'danger');
+      return;
+    }
+
+    const btn = document.getElementById('changePasswordBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Updating...';
+
+    try {
+      const response = await fetch('/profile/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          current_password: document.getElementById('current_password').value,
+          new_password: new_password,
+          confirm_password: confirm_password
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // 1. Reset form and strength bar
+        document.getElementById('changePasswordForm').reset();
+        document.getElementById('passwordStrengthBar').style.width = '0%';
+        document.getElementById('passwordStrengthText').textContent = '-';
+        document.getElementById('passwordMatchText').textContent = '';
+
+        // 2. Show success message
+        showAlert('✓ Password changed successfully. Redirecting to login...', 'success');
+
+        // 3. Redirect to login after 2.5 seconds
+        setTimeout(() => {
+          window.location.href = '/login?msg=password_changed';
+        }, 2500);
+
+      } else {
+        showAlert(data.error || 'Failed to change password', 'danger');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-key"></i> Update Password';
+      }
+    } catch (err) {
+      showAlert('Error changing password: ' + err.message, 'danger');
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-key"></i> Update Password';
+    }
+  }
+
+async function deleteAccount() {
+    const email = document.getElementById('deleteEmail').value;
+    const confirmation = document.getElementById('deleteConfirmation').value;
+    const password = document.getElementById('deletePassword').value;
+    const checkbox = document.getElementById('deleteCheckbox').checked;
+
+    if (!email || !confirmation || !password || !checkbox) {
+      showAlert('Please fill all fields and check the confirmation', 'danger');
+      return;
+    }
+
+    const btn = document.getElementById('confirmDeleteBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Deleting...';
+
+    try {
+      const response = await fetch('/profile/delete-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          confirm_email: email,
+          confirmation_text: confirmation,
+          confirm_password: password
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // 1. Close the modal first
+        const modalEl = document.getElementById('deleteAccountModal');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        modal.hide();
+
+        // 2. Wait for modal close animation to finish, then show message
+        modalEl.addEventListener('hidden.bs.modal', function () {
+          showAlert('✓ Account deleted successfully. Redirecting...', 'success');
+
+          // 3. Redirect after 2.5 seconds so user can read the message
+          setTimeout(() => {
+            window.location.href = '/login?msg=account_deleted';
+          }, 3000);
+        }, { once: true }); // { once: true } so listener doesn't stack on re-open
+
+      } else {
+        showAlert(data.error || 'Failed to delete account', 'danger');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-trash-alt"></i> Delete Account Permanently';
+      }
+    } catch (err) {
+      showAlert('Error deleting account: ' + err.message, 'danger');
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-trash-alt"></i> Delete Account Permanently';
+    }
+  }
+
+  function showAlert(message, type = 'info') {
+    const alertContainer = document.getElementById('alertContainer');
+    const alertId = 'alert-' + Date.now();
+    
+    const iconMap = {
+      'success': 'check-circle',
+      'danger': 'exclamation-circle',
+      'warning': 'exclamation-triangle',
+      'info': 'info-circle'
+    };
+
+    alertContainer.innerHTML = `
+      <div id="${alertId}" class="alert alert-${type} alert-dismissible fade show" role="alert">
+        <i class="fas fa-${iconMap[type] || 'info-circle'}"></i>
+        <span class="ms-2">${message}</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    `;
+
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+      const alert = document.getElementById(alertId);
+      if (alert) {
+        const bsAlert = new bootstrap.Alert(alert);
+        bsAlert.close();
+      }
+    }, 5000);
+  }
+</script>
+
+<%- include('partials/footer') %>

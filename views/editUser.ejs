@@ -1,0 +1,241 @@
+<%- include('partials/header') %>
+
+<div class="container py-4">
+
+  <div class="mb-4 d-flex align-items-center gap-3 flex-wrap">
+    <a href="/" class="btn btn-sm btn-outline-secondary w-100 w-md-auto">&larr; Back</a>
+    <h1 class="h4 fw-bold mb-0">Edit User</h1>
+  </div>
+
+  <form action="/edit-user/<%= user.id %>/edit" method="POST" enctype="multipart/form-data" id="editUserForm">
+    <input type="hidden" name="_method" value="PUT"/>
+
+    <!-- Personal Information -->
+    <p class="text-muted text-uppercase fw-semibold small border-bottom pb-1 mb-3">Personal Information</p>
+    <div class="row g-3 mb-4">
+      <div class="col-md-6">
+        <label for="name" class="form-label">Full Name <span class="text-danger">*</span></label>
+        <input type="text" class="form-control" id="name" name="name" value="<%= user.name %>" placeholder="e.g. John Doe" required/>
+      </div>
+
+      <!-- Profile Image -->
+      <div class="col-md-6">
+        <label class="form-label">Profile Image</label>
+
+        <!-- Current image preview -->
+        <div class="d-flex align-items-center gap-2 mb-2" id="currentImagePreview">
+          <img
+            id="profileThumb"
+            src="<%= user.profile_image || '/images/default-avatar.png' %>"
+            alt="Profile"
+            style="width:40px;height:40px;border-radius:50%;object-fit:cover;border:1px solid #dee2e6;"
+          />
+          <span class="form-text mb-0" id="imageLabel">
+            <% if (user.profile_image) { %>Current photo<% } else { %>Default avatar<% } %>
+          </span>
+          <% if (user.profile_image) { %>
+          <button type="button" class="btn btn-sm btn-outline-danger ms-auto" id="removeImageBtn">&times; Remove</button>
+          <% } %>
+        </div>
+
+        <!-- Pending-removal notice + undo -->
+        <div id="undoRemoveRow" style="display:none;" class="d-flex align-items-center gap-2 mb-2">
+          <span class="form-text text-danger mb-0">Image will be removed on save.</span>
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="undoRemoveBtn">↩ Undo</button>
+        </div>
+
+        <input type="file" class="form-control" name="profile_image" id="profileImageInput" accept="image/*"/>
+        <input type="hidden" name="existing_profile_image" id="existingProfileImage" value="<%= user.profile_image %>"/>
+        <input type="hidden" name="remove_profile_image" id="removeProfileImage" value="false"/>
+      </div>
+
+      <div class="col-md-6">
+        <label for="email" class="form-label">Email Address <span class="text-danger">*</span></label>
+        <input type="email" class="form-control" id="email" name="email" value="<%= user.email %>" placeholder="user@school.ac.ke" required/>
+      </div>
+      <div class="col-md-6">
+        <label for="phone" class="form-label">Phone Number</label>
+        <input type="tel" class="form-control" id="phone" name="phone" value="<%= user.phone %>" placeholder="+254 7XX XXX XXX"/>
+      </div>
+      <div class="col-md-6">
+        <label for="id_no" class="form-label">ID Number</label>
+        <input type="text" class="form-control" id="id_no" name="id_no" value="<%= user.id_no %>" placeholder="National ID / Passport No."/>
+      </div>
+      <div class="col-md-6">
+        <label for="tsc_no" class="form-label">TSC Number</label>
+        <input type="text" class="form-control" id="tsc_no" name="tsc_no" value="<%= user.tsc_no %>" placeholder="TSC/XXXXX/XXXX"/>
+      </div>
+      <div class="col-md-6">
+        <label for="role" class="form-label">Role <span class="text-danger">*</span></label>
+        <select class="form-select" id="role" name="role" required>
+          <option value="1" <%= user.role == 1 ? 'selected' : '' %>>Admin</option>
+          <option value="2" <%= user.role == 2 ? 'selected' : '' %>>Teacher</option>
+          <option value="3" <%= user.role == 3 ? 'selected' : '' %>>Learner</option>
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label for="assessment_number" class="form-label">Assessment Number</label>
+        <input type="text" class="form-control" id="assessment_number" name="assessment_number" value="<%= user.assessment_number %>" placeholder="Learner / Staff assessment ref."/>
+      </div>
+      <div class="col-md-6">
+        <label for="password" class="form-label">New Password</label>
+        <input type="password" class="form-control" id="password" name="password" placeholder="Leave blank to keep current"/>
+        <div class="form-text">Only fill this to change the password</div>
+      </div>
+      <div class="col-md-6">
+        <label for="confirm_password" class="form-label">Confirm New Password</label>
+        <input type="password" class="form-control" id="confirm_password" name="confirm_password" placeholder="Re-enter new password"/>
+        <div class="invalid-feedback">Passwords do not match.</div>
+      </div>
+    </div>
+
+    <!-- Professional Details -->
+    <p class="text-muted text-uppercase fw-semibold small border-bottom pb-1 mb-3">Professional Details</p>
+    <div class="row g-3 mb-4">
+      <div class="col-md-6">
+        <label for="responsibility" class="form-label">Responsibility</label>
+        <input type="text" class="form-control" id="responsibility" name="responsibility" value="<%= user.responsibility %>" placeholder="e.g. Class Teacher, Head of Department"/>
+      </div>
+      <div class="col-md-6">
+        <label for="department" class="form-label">Department</label>
+        <input type="text" class="form-control" id="department" name="department" value="<%= user.department %>" placeholder="e.g. Sciences, Humanities"/>
+      </div>
+      <div class="col-md-6">
+        <label for="subject_combination" class="form-label">Subject Combination</label>
+        <input type="text" class="form-control" id="subject_combination" name="subject_combination" value="<%= user.subject_combination %>" placeholder="e.g. Maths / Physics / Chemistry"/>
+      </div>
+      <div class="col-md-6">
+        <label for="grade" class="form-label">Grade</label>
+        <input type="text" class="form-control" id="grade" name="grade" value="<%= user.grade %>" placeholder="e.g. Grade 7, Form 3"/>
+      </div>
+    </div>
+
+    <!-- Address Details -->
+    <p class="text-muted text-uppercase fw-semibold small border-bottom pb-1 mb-3">Address Details</p>
+    <div class="row g-3 mb-4">
+      <div class="col-md-6">
+        <label for="street" class="form-label">Street Address</label>
+        <input type="text" class="form-control" id="street" name="street" value="<%= user.street %>" placeholder="e.g. 14 Kimathi Street"/>
+      </div>
+      <div class="col-md-6">
+        <label for="apartment" class="form-label">Apartment / Suite</label>
+        <input type="text" class="form-control" id="apartment" name="apartment" value="<%= user.apartment %>" placeholder="Apt 3B"/>
+      </div>
+      <div class="col-md-4">
+        <label for="city" class="form-label">City</label>
+        <input type="text" class="form-control" id="city" name="city" value="<%= user.city %>" placeholder="Nairobi"/>
+      </div>
+      <div class="col-md-4">
+        <label for="zip" class="form-label">ZIP / Postal Code</label>
+        <input type="text" class="form-control" id="zip" name="zip" value="<%= user.zip %>" placeholder="00100"/>
+      </div>
+      <div class="col-md-4">
+        <label for="country" class="form-label">Country</label>
+        <input type="text" class="form-control" id="country" name="country" value="<%= user.country %>" placeholder="Kenya"/>
+      </div>
+    </div>
+
+    <!-- Account Settings -->
+    <p class="text-muted text-uppercase fw-semibold small border-bottom pb-1 mb-3">Account Settings</p>
+    <div class="row g-3 mb-4">
+      <div class="col-md-6">
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" id="is_admin" name="is_admin" value="true" <%= user.is_admin ? 'checked' : '' %>/>
+          <label class="form-check-label" for="is_admin">Grant administrator access</label>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" id="email_verified" name="email_verified" value="true" <%= user.email_verified ? 'checked' : '' %>/>
+          <label class="form-check-label" for="email_verified">Mark email as verified</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-grid gap-2 d-md-flex justify-content-end border-top pt-3">
+      <a href="/" class="btn btn-outline-secondary w-100 w-md-auto">Cancel</a>
+      <button type="submit" class="btn btn-primary w-100 w-md-auto">Save Changes</button>
+    </div>
+
+  </form>
+</div>
+
+<script>
+  const DEFAULT_AVATAR  = '/images/default-avatar.png';
+  const originalSrc     = '<%= user.profile_image %>' || DEFAULT_AVATAR;
+
+  const removeBtn       = document.getElementById('removeImageBtn');
+  const undoRemoveBtn   = document.getElementById('undoRemoveBtn');
+  const removeFlag      = document.getElementById('removeProfileImage');
+  const existingImage   = document.getElementById('existingProfileImage');
+  const imagePreview    = document.getElementById('currentImagePreview');
+  const undoRow         = document.getElementById('undoRemoveRow');
+  const fileInput       = document.getElementById('profileImageInput');
+  const profileThumb    = document.getElementById('profileThumb');
+  const imageLabel      = document.getElementById('imageLabel');
+
+  function markForRemoval() {
+    removeFlag.value    = 'true';
+    existingImage.value = '';
+    // Swap to default avatar preview
+    profileThumb.src    = DEFAULT_AVATAR;
+    imageLabel.textContent = 'Will revert to default avatar';
+    if (removeBtn) removeBtn.style.display = 'none';
+    undoRow.style.display = 'flex';
+    fileInput.value = '';
+  }
+
+  function undoRemoval() {
+    removeFlag.value    = 'false';
+    existingImage.value = '<%= user.profile_image %>';
+    profileThumb.src    = originalSrc;
+    imageLabel.textContent = 'Current photo';
+    if (removeBtn) removeBtn.style.display = 'inline-block';
+    undoRow.style.display = 'none';
+  }
+
+  if (removeBtn)     removeBtn.addEventListener('click', markForRemoval);
+  if (undoRemoveBtn) undoRemoveBtn.addEventListener('click', undoRemoval);
+
+  // Picking a new file cancels any pending removal and previews the new image
+  if (fileInput) {
+    fileInput.addEventListener('change', function () {
+      if (this.files && this.files[0]) {
+        if (removeFlag.value === 'true') undoRemoval();
+        const reader = new FileReader();
+        reader.onload = e => {
+          profileThumb.src = e.target.result;
+          imageLabel.textContent = 'New photo (not yet saved)';
+        };
+        reader.readAsDataURL(this.files[0]);
+      }
+    });
+  }
+
+  // --- Password confirmation ---
+  document.getElementById('editUserForm').addEventListener('submit', function (e) {
+    const password        = document.getElementById('password');
+    const confirmPassword = document.getElementById('confirm_password');
+
+    if (password.value || confirmPassword.value) {
+      if (password.value !== confirmPassword.value) {
+        e.preventDefault();
+        confirmPassword.classList.add('is-invalid');
+        confirmPassword.focus();
+      } else {
+        confirmPassword.classList.remove('is-invalid');
+      }
+    }
+  });
+
+  document.getElementById('confirm_password').addEventListener('input', function () {
+    const password = document.getElementById('password').value;
+    if (this.value && this.value !== password) {
+      this.classList.add('is-invalid');
+    } else {
+      this.classList.remove('is-invalid');
+    }
+  });
+</script>
+
+<%- include('partials/footer') %>

@@ -1,0 +1,153 @@
+<%- include('partials/header') %>
+
+<div class="container py-5">
+  <div class="card shadow-sm border-0">
+    <div class="card-body">
+      <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4">
+        <div>
+          <h3 class="mb-1">Add Exam Result</h3>
+          <p class="text-muted mb-0">Grade <strong><%= grade %></strong> • Term <strong><%= selectedTerm %></strong></p>
+        </div>
+        <a href="/exams?grade=<%= grade %>&term=<%= selectedTerm %>" class="btn btn-outline-secondary btn-sm w-100 w-md-auto">Back to results</a>
+      </div>
+
+      <form action="/exams/add" method="POST">
+        <input type="hidden" name="grade" value="<%= grade %>">
+        <input type="hidden" name="term" value="<%= selectedTerm %>">
+
+        <div class="row gx-3 mb-4">
+          <div class="col-12 col-lg-6">
+            <label class="form-label fw-semibold">Learner</label>
+            <select name="learner_id" class="form-select form-select-sm" required>
+              <option value="">Select learner</option>
+              <% if ((learners||[]).length === 0) { %>
+                <option value="" disabled>No learners found for this grade.</option>
+              <% } else { %>
+                <% learners.forEach(l => { %>
+                  <option value="<%= l.id %>"><%= l.name %> (<%= l.assessment_number || 'No assessment #' %>)</option>
+                <% }) %>
+              <% } %>
+            </select>
+            <div class="form-text">Choose the learner whose term result you want to record.</div>
+          </div>
+        </div>
+
+        <div class="table-responsive shadow-sm rounded overflow-hidden">
+          <table class="table table-bordered mb-0 align-middle">
+            <thead class="table-secondary">
+              <tr>
+                <th class="fw-semibold">Subject</th>
+                <th class="text-center fw-semibold">CAT1</th>
+                <th class="text-center fw-semibold">CAT2</th>
+                <th class="text-center fw-semibold">Main</th>
+                <th class="text-center fw-semibold">Final</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% const subjects = [
+                { key: 'english', label: 'English' },
+                { key: 'kiswahili', label: 'Kiswahili' },
+                { key: 'mathematics', label: 'Mathematics' },
+                { key: 'integrated_science', label: 'Integrated Science' },
+                { key: 'agriculture', label: 'Agriculture' },
+                { key: 'biology', label: 'Biology' },
+                { key: 'cre', label: 'CRE' },
+                { key: 'pre_technical', label: 'Pre-Technical' },
+                { key: 'creative_arts', label: 'Creative Arts' }
+              ]; %>
+
+              <% subjects.forEach(subject => { %>
+                <tr>
+                  <td><%= subject.label %></td>
+                  <td class="text-center"><input type="number" name="<%= subject.key %>_cat1" class="form-control form-control-sm occasion-input text-center" min="0" max="100"></td>
+                  <td class="text-center"><input type="number" name="<%= subject.key %>_cat2" class="form-control form-control-sm occasion-input text-center" min="0" max="100"></td>
+                  <td class="text-center"><input type="number" name="<%= subject.key %>_main" class="form-control form-control-sm occasion-input text-center" min="0" max="100"></td>
+                  <td class="text-center"><input type="text" class="form-control form-control-sm final-mark text-center" data-subject="<%= subject.key %>" readonly></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="row align-items-center mt-4">
+          <div class="col-12 col-md-8">
+            <div class="alert alert-info mb-0">
+              <strong>Score formula:</strong> CAT1 × 15% + CAT2 × 15% + Main Exam × 70%. Final marks appear live as you type.
+            </div>
+          </div>
+          <div class="col-12 col-md-4 text-md-end mt-3 mt-md-0">
+            <button type="submit" class="btn btn-primary px-4 w-100 w-md-auto">Save Result</button>
+          </div>
+        </div>
+      </form>
+
+      <script>
+        const subjectKeys = ['english','kiswahili','mathematics','integrated_science','agriculture','biology','cre','pre_technical','creative_arts'];
+        const learnersData ="<%- JSON.stringify(typeof learners !== 'undefined' ? learners : []) %>";
+        const learnerSelect = document.querySelector('[name="learner_id"]');
+
+        const parseScore = value => {
+          if (value === '' || value === null || value === undefined) return null;
+          const n = Number(value);
+          return Number.isFinite(n) ? n : null;
+        };
+
+        const getFinalMark = (cat1, cat2, main) => {
+          if (cat1 === null && cat2 === null && main === null) return null;
+          const scoreCat1 = cat1 || 0;
+          const scoreCat2 = cat2 || 0;
+          const scoreMain = main || 0;
+          return Math.round((scoreCat1 / 100) * 15 + (scoreCat2 / 100) * 15 + (scoreMain / 100) * 70);
+        };
+
+        const updateFinal = () => {
+          subjectKeys.forEach(subject => {
+            const cat1 = document.querySelector(`input[name="${subject}_cat1"]`);
+            const cat2 = document.querySelector(`input[name="${subject}_cat2"]`);
+            const main = document.querySelector(`input[name="${subject}_main"]`);
+            const finalField = document.querySelector(`.final-mark[data-subject="${subject}"]`);
+            if (!cat1 || !cat2 || !main || !finalField) return;
+            const finalMark = getFinalMark(parseScore(cat1.value), parseScore(cat2.value), parseScore(main.value));
+            finalField.value = finalMark === null ? '' : finalMark;
+          });
+        };
+
+        const populateLearnerScores = learnerId => {
+          const learner = learnersData.find(l => String(l.id) === String(learnerId) || String(l.learner_id) === String(learnerId));
+          subjectKeys.forEach(subject => {
+            const cat1 = document.querySelector(`input[name="${subject}_cat1"]`);
+            const cat2 = document.querySelector(`input[name="${subject}_cat2"]`);
+            const main = document.querySelector(`input[name="${subject}_main"]`);
+            if (!cat1 || !cat2 || !main) return;
+            if (learner) {
+              cat1.value = learner[`${subject}_cat1`] ?? '';
+              cat2.value = learner[`${subject}_cat2`] ?? '';
+              main.value = learner[`${subject}_main`] ?? '';
+            } else {
+              cat1.value = '';
+              cat2.value = '';
+              main.value = '';
+            }
+          });
+          updateFinal();
+        };
+
+        if (learnerSelect) {
+          learnerSelect.addEventListener('change', event => {
+            populateLearnerScores(event.target.value);
+          });
+        }
+
+        document.querySelectorAll('.occasion-input').forEach(input => {
+          input.addEventListener('input', updateFinal);
+        });
+
+        if (learnerSelect && learnerSelect.value) {
+          populateLearnerScores(learnerSelect.value);
+        }
+      </script>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

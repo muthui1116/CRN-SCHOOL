@@ -1,0 +1,99 @@
+<%- include('partials/header') %>
+
+<div class="container py-5">
+  <div class="card shadow-sm border-0">
+    <div class="card-body">
+      <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4">
+        <div>
+          <h3 class="mb-1">Upload Homework Task</h3>
+          <p class="text-muted mb-0">Assign homework for a class with PDF or DOCX files</p>
+        </div>
+        <a href="/exams" class="btn btn-outline-secondary btn-sm">Back to exams</a>
+      </div>
+
+      <form action="/exams/homework" method="POST" enctype="multipart/form-data">
+        <!-- Grade and Term Selection -->
+        <div class="row gx-3 mb-4">
+          <div class="col-12 col-lg-6">
+            <label class="form-label fw-semibold">Grade <span class="text-danger">*</span></label>
+            <select name="grade" class="form-select form-select-sm" required>
+              <option value="">Select a grade</option>
+              <% grades.forEach(grade => { %>
+                <option value="<%= grade %>">Grade <%= grade %></option>
+              <% }) %>
+            </select>
+            <div class="form-text">Select the grade for which you are assigning this homework.</div>
+          </div>
+
+          <!-- Term Selection -->
+          <div class="col-12 col-lg-6">
+            <label class="form-label fw-semibold">Term <span class="text-danger">*</span></label>
+            <select name="term" class="form-select form-select-sm" required>
+              <option value="">Select a term</option>
+              <option value="1">Term 1</option>
+              <option value="2">Term 2</option>
+              <option value="3">Term 3</option>
+            </select>
+            <div class="form-text">Select the term for which this homework is assigned.</div>
+          </div>
+        </div>
+
+        <!-- Subject Selection (Optional) -->
+        <div class="row gx-3 mb-4">
+          <div class="col-12 col-lg-6">
+            <label class="form-label fw-semibold">Subject <span class="text-muted">(Optional)</span></label>
+            <select name="subject" class="form-select form-select-sm">
+              <option value="">Select a subject (optional)</option>
+              <option value="english">English</option>
+              <option value="kiswahili">Kiswahili</option>
+              <option value="mathematics">Mathematics</option>
+              <option value="integrated_science">Integrated Science</option>
+              <option value="agriculture">Agriculture</option>
+              <option value="biology">Biology</option>
+              <option value="cre">CRE</option>
+              <option value="pre_technical">Pre-Technical</option>
+              <option value="creative_arts">Creative Arts</option>
+            </select>
+            <div class="form-text">Specify the subject if this homework is for a specific subject.</div>
+          </div>
+        </div>
+
+        <!-- Task Description -->
+        <div class="row gx-3 mb-4">
+          <div class="col-12">
+            <label class="form-label fw-semibold">Task Description <span class="text-muted">(Optional)</span></label>
+            <textarea name="task_description" class="form-control form-control-sm" rows="4" placeholder="Enter task details, instructions, or any additional information..."></textarea>
+            <div class="form-text">Provide any additional instructions or context for the homework task.</div>
+          </div>
+        </div>
+
+        <!-- File Upload -->
+        <div class="row gx-3 mb-4">
+          <div class="col-12">
+            <label class="form-label fw-semibold">Upload Document <span class="text-danger">*</span></label>
+            <div class="input-group">
+              <input type="file" name="document" class="form-control form-control-sm" accept=".pdf,.doc,.docx" required>
+              <span class="input-group-text">
+                <i class="fas fa-file-upload"></i>
+              </span>
+            </div>
+            <div class="form-text">
+              <i class="fas fa-info-circle me-1"></i>
+              Accepted formats: PDF, DOCX (Microsoft Word). Maximum file size: 10MB.
+            </div>
+          </div>
+        </div>
+
+        <!-- Submit Button -->
+        <div class="d-grid gap-2 d-md-flex justify-content-end pt-3 border-top">
+          <a href="/exams" class="btn btn-outline-secondary btn-sm w-100 w-md-auto">Cancel</a>
+          <button type="submit" class="btn btn-primary btn-sm w-100 w-md-auto">
+            <i class="fas fa-upload me-2"></i>Upload Homework
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

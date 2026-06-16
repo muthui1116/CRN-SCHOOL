@@ -1,0 +1,102 @@
+<%- include('partials/header') %>
+
+<div class="container py-5">
+  <div class="card shadow-sm border-0">
+    <div class="card-body">
+      <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4">
+        <div>
+          <h3 class="mb-1">Edit Exam Result</h3>
+          <p class="text-muted mb-0"><strong><%= exam.name %></strong> • Term <strong><%= selectedTerm || exam.term %></strong></p>
+        </div>
+        <a href="/exams?grade=<%= selectedGrade || exam.learner_grade || exam.grade %>&term=<%= selectedTerm || exam.term %>" class="btn btn-outline-secondary btn-sm w-100 w-md-auto">Back to results</a>
+      </div>
+
+      <form action="/exams/<%= exam.id %>/edit" method="POST">
+        <input type="hidden" name="grade" value="<%= selectedGrade || exam.learner_grade || exam.grade %>">
+        <input type="hidden" name="term" value="<%= selectedTerm || exam.term %>">
+
+        <div class="table-responsive shadow-sm rounded overflow-hidden">
+          <table class="table table-bordered mb-0 align-middle">
+            <thead class="table-secondary">
+              <tr>
+                <th class="fw-semibold">Subject</th>
+                <th class="text-center fw-semibold">CAT1</th>
+                <th class="text-center fw-semibold">CAT2</th>
+                <th class="text-center fw-semibold">Main</th>
+                <th class="text-center fw-semibold">Final</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% const subjects = [
+                { key: 'english', label: 'English' },
+                { key: 'kiswahili', label: 'Kiswahili' },
+                { key: 'mathematics', label: 'Mathematics' },
+                { key: 'integrated_science', label: 'Integrated Science' },
+                { key: 'agriculture', label: 'Agriculture' },
+                { key: 'biology', label: 'Biology' },
+                { key: 'cre', label: 'CRE' },
+                { key: 'pre_technical', label: 'Pre-Technical' },
+                { key: 'creative_arts', label: 'Creative Arts' }
+              ]; %>
+
+              <% subjects.forEach(subject => { %>
+                <tr>
+                  <td><%= subject.label %></td>
+                  <td class="text-center"><input type="number" name="<%= subject.key %>_cat1" class="form-control form-control-sm edit-input text-center" min="0" max="100" value="<%= exam[subject.key + '_cat1'] ?? '' %>"></td>
+                  <td class="text-center"><input type="number" name="<%= subject.key %>_cat2" class="form-control form-control-sm edit-input text-center" min="0" max="100" value="<%= exam[subject.key + '_cat2'] ?? '' %>"></td>
+                  <td class="text-center"><input type="number" name="<%= subject.key %>_main" class="form-control form-control-sm edit-input text-center" min="0" max="100" value="<%= exam[subject.key + '_main'] ?? '' %>"></td>
+                  <td class="text-center"><input type="text" class="form-control form-control-sm final-mark text-center" data-subject="<%= subject.key %>" readonly value="<%= exam[subject.key] ?? '' %>"></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="row align-items-center mt-4">
+          <div class="col-12 col-md-8">
+            <div class="alert alert-info mb-0">
+              <strong>Score formula:</strong> CAT1 × 15% + CAT2 × 15% + Main Exam × 70%. EVRG updates automatically from your updated marks.
+            </div>
+          </div>
+          <div class="col-12 col-md-4 text-md-end mt-3 mt-md-0">
+            <button type="submit" class="btn btn-primary px-4 w-100 w-md-auto">Update Result</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  const parseScore = value => {
+    if (value === '' || value === null || value === undefined) return null;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const getFinalMark = (cat1, cat2, main) => {
+    if (cat1 === null && cat2 === null && main === null) return null;
+    const scoreCat1 = cat1 || 0;
+    const scoreCat2 = cat2 || 0;
+    const scoreMain = main || 0;
+    return Math.round((scoreCat1 / 100) * 15 + (scoreCat2 / 100) * 15 + (scoreMain / 100) * 70);
+  };
+
+  document.querySelectorAll('.edit-input').forEach(input => {
+    input.addEventListener('input', () => {
+      const row = input.closest('tr');
+      if (!row) return;
+      const subject = row.querySelector('.final-mark')?.dataset.subject;
+      if (!subject) return;
+      const cat1 = row.querySelector(`input[name="${subject}_cat1"]`);
+      const cat2 = row.querySelector(`input[name="${subject}_cat2"]`);
+      const main = row.querySelector(`input[name="${subject}_main"]`);
+      const finalField = row.querySelector('.final-mark');
+      if (!cat1 || !cat2 || !main || !finalField) return;
+      const finalMark = getFinalMark(parseScore(cat1.value), parseScore(cat2.value), parseScore(main.value));
+      finalField.value = finalMark === null ? '' : finalMark;
+    });
+  });
+</script>
+
+<%- include('partials/footer') %>

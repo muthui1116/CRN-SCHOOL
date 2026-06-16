@@ -1,0 +1,33 @@
+<% title = "Edit Grade"; %>
+<div class="row">
+  <div class="col-12 col-md-6 offset-md-3">
+    <div class="card">
+      <div class="card-header">
+        <h3>Edit Grade — <%= grade.name %></h3>
+      </div>
+      <div class="card-body">
+        <form action="/grades/<%= grade.id %>/edit" method="POST">
+          <div class="mb-3">
+            <label>Name</label>
+            <input name="name" value="<%= grade.name %>" class="form-control" />
+          </div>
+          <div class="mb-3">
+            <label>Enrolment</label>
+            <input name="enrolment" value="<%= grade.enrolment || '' %>" class="form-control" />
+          </div>
+          <div class="mb-3">
+            <label>Class Teacher</label>
+            <select name="class_teacher" class="form-control">
+              <option value="">Select teacher</option>
+              <% (teachers||[]).forEach(t => { %>
+                <option value="<%= t.name %>" <%= grade.class_teacher === t.name ? 'selected' : '' %>><%= t.name %></option>
+              <% }) %>
+            </select>
+          </div>
+          <button class="btn btn-primary">Save</button>
+          <a href="/grades" class="btn btn-secondary ms-2">Cancel</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

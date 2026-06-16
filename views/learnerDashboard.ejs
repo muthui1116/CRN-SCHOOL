@@ -1,0 +1,291 @@
+<%- include('partials/header') %>
+
+<div class="container py-5">
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3 mb-4">
+    <div>
+      <h1 class="h3 mb-1">Learner Dashboard</h1>
+      <p class="text-muted mb-0">Welcome back, <strong><%= user.name || user.email %></strong>. Review your exam results below.</p>
+    </div>
+    <div class="d-flex flex-column align-items-start align-items-md-end gap-2">
+      <div>
+        <span class="badge bg-primary me-1">Role: Learner</span>
+        <% const resolvedGrade = userProfile?.grade || user.grade; %>
+        <% if (resolvedGrade) { %>
+          <span class="badge bg-secondary">Grade: <%= resolvedGrade %></span>
+        <% } %>
+      </div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+        <label for="termSelect" class="mb-0 text-muted">Term</label>
+        <select id="termSelect" class="form-select form-select-sm" onchange="window.location.href='/learner?term=' + this.value">
+          <% [1,2,3].forEach(term => { %>
+            <option value="<%= term %>" <%= String(term) === String(selectedTerm) ? 'selected' : '' %> >Term <%= term %></option>
+          <% }) %>
+        </select>
+        <a href="/learner/homework" class="btn btn-sm btn-success ms-2 w-100 w-md-auto">
+          <i class="fas fa-book me-1"></i>My Homework
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="row gy-4">
+    <div class="col-12 col-xl-4">
+      <div class="card shadow-sm border-0">
+        <div class="card-body">
+          <h5 class="card-title mb-3">My Profile</h5>
+          <dl class="row mb-0">
+            <dt class="col-sm-5 text-muted">Name</dt>
+            <dd class="col-sm-7"><%= userProfile?.name || user.name || 'N/A' %></dd>
+
+            <dt class="col-sm-5 text-muted">Email</dt>
+            <dd class="col-sm-7"><%= userProfile?.email || user.email || 'N/A' %></dd>
+
+            <dt class="col-sm-5 text-muted">Phone</dt>
+            <dd class="col-sm-7"><%= userProfile?.phone || 'N/A' %></dd>
+
+            <dt class="col-sm-5 text-muted">Grade</dt>
+            <dd class="col-sm-7"><%= userProfile?.grade || user.grade || 'N/A' %></dd>
+
+            <dt class="col-sm-5 text-muted">Assessment #</dt>
+            <dd class="col-sm-7"><%= userProfile?.assessment_number || user.assessment_number || 'N/A' %></dd>
+
+            <dt class="col-sm-5 text-muted">Joined</dt>
+            <dd class="col-sm-7"><%= userProfile?.date_created ? new Date(userProfile.date_created).toLocaleDateString() : 'N/A' %></dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-xl-8">
+      <div class="card shadow-sm border-0">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+              <h5 class="card-title mb-0">My Exam Results</h5>
+              <small class="text-muted">Your performance across all subjects.</small>
+            </div>
+          </div>
+
+          <% if (!learnerRecord) { %>
+            <div class="alert alert-warning mb-0">
+              <strong>No exam results recorded yet.</strong><br>
+              <small>Assessment #: <%= userProfile?.assessment_number || 'Not set' %></small>
+            </div>
+          <% } else { %>
+            <!-- Desktop table view -->
+            <div class="d-none d-md-block table-responsive">
+              <table class="table table-bordered align-middle mb-0">
+                <tbody>
+                  <tr>
+                    <td class="fw-semibold">English</td>
+                    <td><%= learnerRecord.english || '—' %></td>
+                    <td><span class="badge bg-info"><%= learnerRecord.english_pl || '—' %></span></td>
+                    <td><%= learnerRecord.english_points || '—' %> pts</td>
+                  </tr>
+                  <tr>
+                    <td class="fw-semibold">Kiswahili</td>
+                    <td><%= learnerRecord.kiswahili || '—' %></td>
+                    <td><span class="badge bg-info"><%= learnerRecord.kiswahili_pl || '—' %></span></td>
+                    <td><%= learnerRecord.kiswahili_points || '—' %> pts</td>
+                  </tr>
+                  <tr>
+                    <td class="fw-semibold">Mathematics</td>
+                    <td><%= learnerRecord.mathematics || '—' %></td>
+                    <td><span class="badge bg-info"><%= learnerRecord.mathematics_pl || '—' %></span></td>
+                    <td><%= learnerRecord.mathematics_points || '—' %> pts</td>
+                  </tr>
+                  <tr>
+                    <td class="fw-semibold">Integrated Science</td>
+                    <td><%= learnerRecord.integrated_science || '—' %></td>
+                    <td><span class="badge bg-info"><%= learnerRecord.integrated_science_pl || '—' %></span></td>
+                    <td><%= learnerRecord.integrated_science_points || '—' %> pts</td>
+                  </tr>
+                  <tr>
+                    <td class="fw-semibold">Agriculture</td>
+                    <td><%= learnerRecord.agriculture || '—' %></td>
+                    <td><span class="badge bg-info"><%= learnerRecord.agriculture_pl || '—' %></span></td>
+                    <td><%= learnerRecord.agriculture_points || '—' %> pts</td>
+                  </tr>
+                  <tr>
+                    <td class="fw-semibold">Biology</td>
+                    <td><%= learnerRecord.biology || '—' %></td>
+                    <td><span class="badge bg-info"><%= learnerRecord.biology_pl || '—' %></span></td>
+                    <td><%= learnerRecord.biology_points || '—' %> pts</td>
+                  </tr>
+                  <tr>
+                    <td class="fw-semibold">CRE</td>
+                    <td><%= learnerRecord.cre || '—' %></td>
+                    <td><span class="badge bg-info"><%= learnerRecord.cre_pl || '—' %></span></td>
+                    <td><%= learnerRecord.cre_points || '—' %> pts</td>
+                  </tr>
+                  <tr>
+                    <td class="fw-semibold">Pre-Technical</td>
+                    <td><%= learnerRecord.pre_technical || '—' %></td>
+                    <td><span class="badge bg-info"><%= learnerRecord.pre_technical_pl || '—' %></span></td>
+                    <td><%= learnerRecord.pre_technical_points || '—' %> pts</td>
+                  </tr>
+                  <tr>
+                    <td class="fw-semibold">Creative Arts</td>
+                    <td><%= learnerRecord.creative_arts || '—' %></td>
+                    <td><span class="badge bg-info"><%= learnerRecord.creative_arts_pl || '—' %></span></td>
+                    <td><%= learnerRecord.creative_arts_points || '—' %> pts</td>
+                  </tr>
+                  <tr class="table-primary fw-bold">
+                    <td>Overall Average</td>
+                    <td><%= learnerRecord.evrg || '—' %></td>
+                    <td><span class="badge bg-success"><%= learnerRecord.evrg_pl || '—' %></span></td>
+                    <td><%= learnerRecord.evrg_points || '—' %> pts</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Mobile card view fallback -->
+            <div class="d-block d-md-none">
+              <div class="row row-cols-1 g-2">
+                <div class="col">
+                  <div class="card shadow-sm">
+                    <div class="card-body p-3">
+                      <div class="row row-cols-2 row-cols-sm-4 g-3">
+                        <div class="col">
+                          <small class="d-block text-muted">English</small>
+                          <div><strong><%= learnerRecord.english || '—' %></strong></div>
+                          <small><span class="badge bg-info"><%= learnerRecord.english_pl || '—' %></span></small>
+                          <div class="small text-muted"><%= learnerRecord.english_points || '—' %> pts</div>
+                        </div>
+                        <div class="col">
+                          <small class="d-block text-muted">Kiswahili</small>
+                          <div><strong><%= learnerRecord.kiswahili || '—' %></strong></div>
+                          <small><span class="badge bg-info"><%= learnerRecord.kiswahili_pl || '—' %></span></small>
+                          <div class="small text-muted"><%= learnerRecord.kiswahili_points || '—' %> pts</div>
+                        </div>
+                        <div class="col">
+                          <small class="d-block text-muted">Mathematics</small>
+                          <div><strong><%= learnerRecord.mathematics || '—' %></strong></div>
+                          <small><span class="badge bg-info"><%= learnerRecord.mathematics_pl || '—' %></span></small>
+                          <div class="small text-muted"><%= learnerRecord.mathematics_points || '—' %> pts</div>
+                        </div>
+                        <div class="col">
+                          <small class="d-block text-muted">Int. Science</small>
+                          <div><strong><%= learnerRecord.integrated_science || '—' %></strong></div>
+                          <small><span class="badge bg-info"><%= learnerRecord.integrated_science_pl || '—' %></span></small>
+                          <div class="small text-muted"><%= learnerRecord.integrated_science_points || '—' %> pts</div>
+                        </div>
+                        <div class="col">
+                          <small class="d-block text-muted">Agriculture</small>
+                          <div><strong><%= learnerRecord.agriculture || '—' %></strong></div>
+                          <small><span class="badge bg-info"><%= learnerRecord.agriculture_pl || '—' %></span></small>
+                          <div class="small text-muted"><%= learnerRecord.agriculture_points || '—' %> pts</div>
+                        </div>
+                        <div class="col">
+                          <small class="d-block text-muted">Biology</small>
+                          <div><strong><%= learnerRecord.biology || '—' %></strong></div>
+                          <small><span class="badge bg-info"><%= learnerRecord.biology_pl || '—' %></span></small>
+                          <div class="small text-muted"><%= learnerRecord.biology_points || '—' %> pts</div>
+                        </div>
+                        <div class="col">
+                          <small class="d-block text-muted">CRE</small>
+                          <div><strong><%= learnerRecord.cre || '—' %></strong></div>
+                          <small><span class="badge bg-info"><%= learnerRecord.cre_pl || '—' %></span></small>
+                          <div class="small text-muted"><%= learnerRecord.cre_points || '—' %> pts</div>
+                        </div>
+                        <div class="col">
+                          <small class="d-block text-muted">Pre-Tech</small>
+                          <div><strong><%= learnerRecord.pre_technical || '—' %></strong></div>
+                          <small><span class="badge bg-info"><%= learnerRecord.pre_technical_pl || '—' %></span></small>
+                          <div class="small text-muted"><%= learnerRecord.pre_technical_points || '—' %> pts</div>
+                        </div>
+                        <div class="col">
+                          <small class="d-block text-muted">Creative Arts</small>
+                          <div><strong><%= learnerRecord.creative_arts || '—' %></strong></div>
+                          <small><span class="badge bg-info"><%= learnerRecord.creative_arts_pl || '—' %></span></small>
+                          <div class="small text-muted"><%= learnerRecord.creative_arts_points || '—' %> pts</div>
+                        </div>
+                      </div>
+                      <hr class="my-3">
+                      <div class="row">
+                        <div class="col-12">
+                          <div class="p-2 bg-light rounded">
+                            <small class="d-block text-muted">Overall Average</small>
+                            <div class="d-flex justify-content-between align-items-center">
+                              <strong><%= learnerRecord.evrg || '—' %></strong>
+                              <span class="badge bg-success"><%= learnerRecord.evrg_pl || '—' %></span>
+                              <span class="small text-muted"><%= learnerRecord.evrg_points || '—' %> pts</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          <% } %>
+
+          <% if (homeworkList && homeworkList.length > 0) { %>
+            <div class="mt-4">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="card-title mb-0">Homework Assignments</h5>
+                <small class="text-muted"><%= homeworkList.length %> assignment(s)</small>
+              </div>
+              <% homeworkList.forEach(hw => { %>
+                <div class="card mb-3 shadow-sm">
+                  <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start gap-3">
+                      <div>
+                        <h6 class="fw-semibold mb-1">
+                          <% if (hw.subject) { %>
+                            <span class="badge bg-primary me-2"><%= hw.subject.charAt(0).toUpperCase() + hw.subject.slice(1) %></span>
+                          <% } %>
+                          Homework for Grade <%= hw.grade %>
+                        </h6>
+                        <p class="mb-1 text-muted small">Assigned by <strong><%= hw.teacher_name %></strong> on <%= new Date(hw.created_at).toLocaleDateString() %></p>
+                        <p class="mb-0"><%= hw.task_description || 'No task description provided.' %></p>
+                      </div>
+                      <div class="text-end d-grid gap-2 d-md-flex justify-content-end">
+                        <% if (hw.document_path) { %>
+                          <a href="/<%= hw.document_path %>" class="btn btn-sm btn-outline-secondary mb-2 w-100 w-md-auto" download>
+                            <i class="fas fa-download me-1"></i>Download
+                          </a>
+                        <% } %>
+                        <a href="/learner/homework/<%= hw.id %>" class="btn btn-sm btn-primary w-100 w-md-auto">
+                          <i class="fas fa-arrow-right me-1"></i>Open
+                        </a>
+                      </div>
+                    </div>
+                    <% if (hw.submission_id) { %>
+                      <div class="mt-3">
+                        <span class="badge bg-success">Submitted</span>
+                        <% if (hw.teacher_score !== null) { %>
+                          <span class="badge bg-success"><%= hw.teacher_score %>%</span>
+                        <% } %>
+                        <% if (hw.teacher_feedback) { %>
+                          <span class="badge bg-info">Feedback available</span>
+                        <% } %>
+                      </div>
+                    <% } else { %>
+                      <div class="mt-3">
+                        <span class="badge bg-warning text-dark">Pending submission</span>
+                      </div>
+                    <% } %>
+                  </div>
+                </div>
+              <% }) %>
+            </div>
+          <% } else { %>
+            <div class="alert alert-light mt-4">
+              <p class="mb-0">No homework assignments are currently available for your grade.</p>
+            </div>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<%- include('partials/footer') %>
+
+<style>
+  .table-primary {
+    background-color: rgba(13, 110, 253, 0.1);
+  }
+</style>

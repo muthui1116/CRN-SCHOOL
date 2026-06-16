@@ -1,0 +1,439 @@
+<%- include('partials/header') %>
+
+<div class="container-fluid">
+  <div class="row g-0">
+
+    <!-- Sidebar (full-width on xs, auto on md+) -->
+    <aside class="col-12 col-md-auto bg-white border-bottom border-md-end sidebar p-0">
+
+      <div class="px-3 py-3 border-bottom">
+        <h6 class="fw-semibold mb-0 text-dark">School Admin</h6>
+        <small class="text-muted">Exam Results</small>
+      </div>
+
+      <div class="px-3 pt-3 pb-1">
+        <span class="text-uppercase text-muted fw-semibold" style="font-size: 10px; letter-spacing: .08em;">Grades</span>
+      </div>
+
+      <% for (let g = 1; g <= 9; g++) { %>
+        <a href="/exams?grade=<%= g %>"
+           class="d-none d-md-flex align-items-center gap-2 px-3 py-2 text-decoration-none sidebar-link <%= selectedGrade == g ? 'active' : '' %>">
+          <i class="fas fa-layer-group fa-sm text-secondary"></i>
+          <span>Grade <%= g %></span>
+        </a>
+      <% } %>
+
+    </aside>
+
+    <!-- Main content -->
+    <main class="col bg-light overflow-auto main-content p-3 p-md-4">
+
+      <div class="d-md-none mb-3">
+        <form class="row g-2">
+          <div class="col-12">
+            <label for="gradeSelectMobile" class="form-label small text-muted mb-1">Select Grade</label>
+            <select id="gradeSelectMobile" class="form-select form-select-sm" onchange="if(this.value) window.location.href='/exams?grade=' + this.value + '&term=<%= selectedTerm %>'">
+              <option value="" <%= !selectedGrade ? 'selected' : '' %>>Choose grade</option>
+              <% for (let g = 1; g <= 9; g++) { %>
+                <option value="<%= g %>" <%= Number(selectedGrade) === g ? 'selected' : '' %>>Grade <%= g %></option>
+              <% } %>
+            </select>
+          </div>
+        </form>
+      </div>
+
+      <% if (!selectedGrade) { %>
+        <!-- Landing state -->
+        <div class="d-flex flex-column align-items-center justify-content-center" style="min-height: 60vh;">
+          <i class="fas fa-book-open fa-3x text-muted mb-3"></i>
+          <h5 class="text-muted">Select a grade to view exam results</h5>
+        </div>
+
+      <% } else { %>
+
+        <!-- Header row -->
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-4">
+          <div>
+            <h4 class="mb-0 fw-semibold">Grade <%= selectedGrade %> — Exam Results</h4>
+            <small class="text-muted">Term <%= selectedTerm %> • <%= (learners||[]).length %> learner(s)</small>
+          </div>
+          <div class="exam-btn-group w-100 w-md-auto ms-md-auto">
+            <div class="row g-2 align-items-center justify-content-end">
+              <div class="col-12 col-sm-6 col-lg-auto">
+                <a href="/exams?grade=<%= selectedGrade %>&term=<%= selectedTerm %>" class="btn btn-sm btn-outline-secondary w-100 w-lg-auto">Refresh</a>
+              </div>
+              <div class="col-12 col-sm-6 col-lg-auto">
+                <div class="dropdown">
+                  <button class="btn btn-sm btn-outline-secondary dropdown-toggle w-100 w-lg-auto" type="button" id="termDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                    Term <%= selectedTerm %>
+                  </button>
+                  <ul class="dropdown-menu" aria-labelledby="termDropdown">
+                    <li><a class="dropdown-item <%= selectedTerm === '1' ? 'active' : '' %>" href="/exams?grade=<%= selectedGrade %>&term=1">Term 1</a></li>
+                    <li><a class="dropdown-item <%= selectedTerm === '2' ? 'active' : '' %>" href="/exams?grade=<%= selectedGrade %>&term=2">Term 2</a></li>
+                    <li><a class="dropdown-item <%= selectedTerm === '3' ? 'active' : '' %>" href="/exams?grade=<%= selectedGrade %>&term=3">Term 3</a></li>
+                  </ul>
+                </div>
+              </div>
+              <div class="col-12 col-sm-6 col-lg-auto">
+                <a href="/exams/add?grade=<%= selectedGrade %>&term=<%= selectedTerm %>" class="btn btn-sm btn-primary w-100 w-lg-auto">Add Result</a>
+              </div>
+              <div class="col-12 col-sm-6 col-lg-auto">
+                <a href="/exams/homework" class="btn btn-sm btn-success w-100 w-lg-auto">
+                  <i class="fas fa-book me-1"></i><span class="d-inline d-lg-none">HW</span><span class="d-none d-lg-inline">Homework</span>
+                </a>
+              </div>
+              <div class="col-12 col-sm-6 col-lg-auto">
+                <a href="/exams/homework/submissions?grade=<%= selectedGrade %>&term=<%= selectedTerm %>" class="btn btn-sm btn-outline-success w-100 w-lg-auto">
+                  <i class="fas fa-clipboard-list me-1"></i><span class="d-none d-md-inline">Grade Subs</span><span class="d-inline d-md-none">Subs</span>
+                </a>
+              </div>
+              <div class="col-12 col-sm-6 col-lg-auto">
+                <a href="/exams/export?grade=<%= selectedGrade %>&term=<%= selectedTerm %>" class="btn btn-sm btn-outline-success w-100 w-lg-auto">
+                  <i class="fas fa-download me-1"></i>Export
+                </a>
+              </div>
+              <div class="col-12 col-sm-6 col-lg-auto">
+                <a href="/exams/bestin?grade=<%= selectedGrade %>&term=<%= selectedTerm %>" class="btn btn-sm btn-outline-primary w-100 w-lg-auto" target="_blank">
+                  <i class="fas fa-star me-1"></i>Best In
+                </a>
+              </div>
+              <div class="col-12 col-sm-6 col-lg-auto">
+                <a href="/exams/rubric?grade=<%= selectedGrade %>&term=<%= selectedTerm %>" class="btn btn-sm btn-outline-info w-100 w-lg-auto" target="_blank">
+                  <i class="fas fa-file-pdf me-1"></i>Rubric
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Submitted homework section (responsive) -->
+        <% if (submittedHomework && submittedHomework.length > 0) { %>
+        <div class="card border-0 shadow-sm mb-4">
+          <div class="card-body">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-3 <%= selectedTerm === '1' ? 'mb-md-5' : 'mb-md-4' %>">
+              <div>
+                <h5 class="mb-0">Submitted Homework — Term <%= selectedTerm %></h5>
+                <small class="text-muted"><%= submittedHomework.length %> submission(s) for Grade <%= selectedGrade %></small>
+              </div>
+              <a href="/exams/homework" class="btn btn-sm btn-outline-primary homework-action-btn ms-md-auto">
+                <i class="fas fa-book me-1"></i>Go to Homework
+              </a>
+            </div>
+
+            <div class="table-responsive rounded-2">
+              <table class="table table-sm table-hover mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th>Learner</th>
+                    <th class="d-none d-md-table-cell">Assessment #</th>
+                    <th class="d-none d-lg-table-cell">Subject</th>
+                    <th class="d-none d-lg-table-cell">Submitted</th>
+                    <th>Answer</th>
+                    <th class="d-none d-md-table-cell">Feedback</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% submittedHomework.forEach(hw => { %>
+                  <tr>
+                    <td><%= hw.learner_name || 'N/A' %></td>
+                    <td class="d-none d-md-table-cell"><%= hw.assessment_number || 'N/A' %></td>
+                    <td class="d-none d-lg-table-cell"><%= hw.subject ? hw.subject.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'General' %></td>
+                    <td class="d-none d-lg-table-cell"><%= hw.submitted_at ? new Date(hw.submitted_at).toLocaleDateString() : '—' %></td>
+                    <td>
+                      <% if (hw.answer_document_path) { %>
+                        <a href="/<%= hw.answer_document_path %>" class="btn btn-sm btn-outline-secondary w-100 w-md-auto" download>
+                          <i class="fas fa-download me-1"></i>Download
+                        </a>
+                      <% } else { %>
+                        —
+                      <% } %>
+                    </td>
+                    <td class="d-none d-md-table-cell"><%= hw.teacher_feedback ? 'Yes' : 'No' %></td>
+                  </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <% } %>
+
+      <!-- Results table -->
+      <div class="card border-0 shadow-sm">
+        <div class="card-body p-0">
+          <!-- Scrollable table view for all screens -->
+          <div class="table-responsive">
+            <table class="table table-striped table-hover mb-0 exam-table">
+              <thead class="table-dark">
+                <tr>
+                  <th class="ps-3">Position</th>
+                  <th class="ps-3">Student ID</th>
+                  <th>Name</th>
+                  <th>Assessment No.</th>
+                  <th>Birth Certificate</th>
+                  <th>Class Teacher</th>
+
+                  <!-- Subject columns — each has: mark | grade | points -->
+                  <th colspan="3" class="text-center border-start subject-header">English</th>
+                  <th colspan="3" class="text-center border-start subject-header">Kiswahili</th>
+                  <th colspan="3" class="text-center border-start subject-header">Mathematics</th>
+                  <th colspan="3" class="text-center border-start subject-header">Int. Science</th>
+                  <th colspan="3" class="text-center border-start subject-header">Agriculture</th>
+                  <th colspan="3" class="text-center border-start subject-header">Biology</th>
+                  <th colspan="3" class="text-center border-start subject-header">CRE</th>
+                  <th colspan="3" class="text-center border-start subject-header">Pre-Technical</th>
+                  <th colspan="3" class="text-center border-start subject-header">Creative Arts</th>
+                  <th colspan="3" class="text-center border-start subject-header">EVRG</th>
+
+                  <th class="text-center border-start">Actions</th>
+                </tr>
+                <!-- Sub-header row -->
+                <tr class="table-secondary sub-header">
+                  <th colspan="6"></th>
+                  <% const subjects = 10; %>
+                  <% for (let s = 0; s < subjects; s++) { %>
+                    <th class="text-center border-start sub-col">Mrk</th>
+                    <th class="text-center sub-col">Grd</th>
+                    <th class="text-center sub-col">Pts</th>
+                  <% } %>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <% (learners||[]).forEach((l, i) => { %>
+                <tr>
+                  <td class="ps-3 text-muted"><%= l.pos || '—' %></td>
+                  <td class="ps-3 text-muted"><%= l.learner_id || l.id || 'N/A' %></td>
+                  <td class="fw-medium"><%= l.name || 'N/A' %></td>
+                  <td><%= l.assessment_number || 'N/A' %></td>
+                  <td><%= l.birth_certificate || 'N/A' %></td>
+                  <td><%= l.class_teacher || 'N/A' %></td>
+
+                  <!-- English -->
+                  <td class="text-center border-start"><%= l.english || '—' %></td>
+                  <td class="text-center"><span class="grade-badge"><%= l.english_pl || '—' %></span></td>
+                  <td class="text-center"><%= l.english_points || '—' %></td>
+
+                  <!-- Kiswahili -->
+                  <td class="text-center border-start"><%= l.kiswahili || '—' %></td>
+                  <td class="text-center"><span class="grade-badge"><%= l.kiswahili_pl || '—' %></span></td>
+                  <td class="text-center"><%= l.kiswahili_points || '—' %></td>
+
+                  <!-- Mathematics -->
+                  <td class="text-center border-start"><%= l.mathematics || '—' %></td>
+                  <td class="text-center"><span class="grade-badge"><%= l.mathematics_pl || '—' %></span></td>
+                  <td class="text-center"><%= l.mathematics_points || '—' %></td>
+
+                  <!-- Integrated Science -->
+                  <td class="text-center border-start"><%= l.integrated_science || '—' %></td>
+                  <td class="text-center"><span class="grade-badge"><%= l.integrated_science_pl || '—' %></span></td>
+                  <td class="text-center"><%= l.integrated_science_points || '—' %></td>
+
+                  <!-- Agriculture -->
+                  <td class="text-center border-start"><%= l.agriculture || '—' %></td>
+                  <td class="text-center"><span class="grade-badge"><%= l.agriculture_pl || '—' %></span></td>
+                  <td class="text-center"><%= l.agriculture_points || '—' %></td>
+
+                  <!-- Biology -->
+                  <td class="text-center border-start"><%= l.biology || '—' %></td>
+                  <td class="text-center"><span class="grade-badge"><%= l.biology_pl || '—' %></span></td>
+                  <td class="text-center"><%= l.biology_points || '—' %></td>
+
+                  <!-- CRE -->
+                  <td class="text-center border-start"><%= l.cre || '—' %></td>
+                  <td class="text-center"><span class="grade-badge"><%= l.cre_pl || '—' %></span></td>
+                  <td class="text-center"><%= l.cre_points || '—' %></td>
+
+                  <!-- Pre-Technical -->
+                  <td class="text-center border-start"><%= l.pre_technical || '—' %></td>
+                  <td class="text-center"><span class="grade-badge"><%= l.pre_technical_pl || '—' %></span></td>
+                  <td class="text-center"><%= l.pre_technical_points || '—' %></td>
+
+                  <!-- Creative Arts -->
+                  <td class="text-center border-start"><%= l.creative_arts || '—' %></td>
+                  <td class="text-center"><span class="grade-badge"><%= l.creative_arts_pl || '—' %></span></td>
+                  <td class="text-center"><%= l.creative_arts_points || '—' %></td>
+
+                  <!-- EVRG -->
+                  <td class="text-center border-start"><%= l.evrg || '—' %></td>
+                  <td class="text-center"><span class="grade-badge"><%= l.evrg_pl || '—' %></span></td>
+                  <td class="text-center"><%= l.evrg_points || '—' %></td>
+
+                  <!-- Actions -->
+                    <td class="text-center border-start">
+                      <div class="d-flex gap-2 flex-nowrap justify-content-center align-items-center">
+                        <a href="/exams/<%= l.result_id %>/edit?grade=<%= selectedGrade %>&term=<%= selectedTerm %>" class="btn btn-sm btn-warning">Edit</a>
+                        <form action="/exams/delete/<%= l.result_id %>" method="POST" style="display:inline;">
+                          <input type="hidden" name="grade" value="<%= selectedGrade %>">
+                          <input type="hidden" name="term" value="<%= selectedTerm %>">
+                          <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete this result?')">Del</button>
+                        </form>
+                      </div>
+                    </td>
+                </tr>
+                <% }) %>
+
+                <% if ((learners||[]).length === 0) { %>
+                <tr>
+                  <td colspan="37" class="text-center text-muted py-5">
+                    <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
+                    No results found for Grade <%= selectedGrade %>.
+                    <a href="/exams/add?grade=<%= selectedGrade %>&term=<%= selectedTerm %>">Add the first one.</a>
+                  </td>
+                </tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    <% } %>
+  </div>
+</div>
+
+<style>
+  .sidebar {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 180px;
+    max-width: 320px;
+  }
+
+  .main-content {
+    min-width: 0;
+  }
+
+  .sidebar-link {
+    font-size: 14px;
+    color: #6c757d;
+    transition: background 0.15s;
+    white-space: nowrap;
+  }
+  .sidebar-link:hover {
+    background: #f8f9fa;
+    color: #212529;
+  }
+  .sidebar-link.active {
+    background: #e7f1ff;
+    color: #0d6efd;
+    font-weight: 500;
+    border-left: 3px solid #0d6efd;
+  }
+
+  .exam-btn-group .btn {
+    min-height: 38px;
+  }
+
+  @media (max-width: 991.98px) {
+    .sidebar {
+      width: 100%;
+      max-width: 100%;
+      border-bottom: 1px solid #dee2e6 !important;
+    }
+    .sidebar-link {
+      padding: 0.75rem 0.5rem !important;
+    }
+  }
+
+  @media (max-width: 767.98px) {
+    .main-content {
+      padding: 1rem !important;
+    }
+    .exam-btn-group .btn {
+      width: 100% !important;
+    }
+    .exam-table {
+      font-size: 12px;
+    }
+    .exam-table thead th,
+    .exam-table td {
+      white-space: nowrap;
+    }
+    .exam-table {
+      min-width: 1300px;
+    }
+    .exam-table td,
+    .exam-table th {
+      padding: 0.55rem 0.65rem;
+    }
+    .badge {
+      font-size: 0.825rem;
+    }
+    #gradeSelectMobile {
+      width: 100%;
+    }
+  }
+
+  .exam-table {
+    font-size: 13px;
+  }
+  .exam-table thead th {
+    white-space: nowrap;
+    font-size: 12px;
+  }
+  .subject-header {
+    background-color: #1a1d23 !important;
+    letter-spacing: 0.04em;
+  }
+  .sub-header th {
+    font-size: 11px;
+    color: #6c757d;
+    font-weight: 500;
+  }
+  .sub-col {
+    min-width: 42px;
+  }
+  .grade-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: #e9ecef;
+    font-size: 11px;
+    font-weight: 600;
+    color: #495057;
+  }
+  .homework-action-btn {
+    min-width: auto;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    border-width: 1.5px;
+    padding: 0.45rem 0.85rem;
+  }
+  .homework-action-btn:hover {
+    background: #0d6efd;
+    color: #fff;
+  }
+  @media (min-width: 768px) {
+    .homework-action-btn {
+      min-width: 150px;
+      padding: 0.55rem 0.95rem;
+      font-size: 0.85rem;
+    }
+  }
+</style>
+
+<script>
+  function computeGrade(mark) {
+    const m = Number(mark);
+    if (mark === '' || isNaN(m)) return { pl: '—', pts: '—', cls: '' };
+    if (m < 25)  return { pl: 'BE', pts: '1', cls: 'danger' };
+    if (m < 50)  return { pl: 'AE', pts: '2', cls: 'warning' };
+    if (m < 75)  return { pl: 'ME', pts: '3', cls: 'info' };
+    return       { pl: 'EE', pts: '4', cls: 'success' };
+  }
+
+  document.querySelectorAll('input[type="number"]').forEach(input => {
+    // Find or create the badge next to each input
+    const badge = document.createElement('small');
+    badge.className = 'ms-2 badge bg-secondary';
+    input.closest('.mb-3').querySelector('label').after(badge);
+
+    input.addEventListener('input', () => {
+      const { pl, pts, cls } = computeGrade(input.value);
+      badge.textContent = pl !== '—' ? `${pl} · ${pts} pt` : '';
+      badge.className = `ms-2 badge bg-${cls || 'secondary'}`;
+    });
+  });
+</script>
+
+<%- include('partials/footer') %>

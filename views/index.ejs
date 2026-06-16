@@ -1,0 +1,58 @@
+<% title = "Users List"; %>
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3>Users List</h3>
+                <a href="/users/add" class="btn btn-primary">Add New User</a>
+            </div>
+                        <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Profile</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>Role</th>
+                            <th>Admin</th>
+                            <th>Verified</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% users.forEach(user => { %>
+                        <tr>
+                            <td><%= user.id %></td>
+                            <td>
+                                <% if(user.profile_image) { %>
+                                    <img src="<%= user.profile_image %>" class="profile-img" alt="Profile">
+                                <% } else { %>
+                                    <div class="profile-img bg-secondary text-white d-flex align-items-center justify-content-center">
+                                        <%= user.name ? user.name.charAt(0) : '?' %>
+                                    </div>
+                                <% } %>
+                            </td>
+                            <td><%= user.name || 'N/A' %></td>
+                            <td><%= user.email %></td>
+                            <td><%= user.phone || 'N/A' %></td>
+                            <td><%= user.role == 1 ? 'Admin' : user.role == 2 ? 'Teacher' : 'Student' %></td>
+                            <td><%= user.is_admin ? 'Yes' : 'No' %></td>
+                            <td><%= user.email_verified ? 'Yes' : 'No' %></td>
+                            <td class="table-actions">
+                                <a href="/users/edit/<%= user.id %>" class="btn btn-sm btn-warning">Edit</a>
+                                <form action="/users/delete/<%= user.id %>" method="POST" style="display:inline;">
+                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure?')">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                        <% }); %>
+                    </tbody>
+                                    </table>
+                                </div>
+            </div>
+        </div>
+    </div>
+</div>

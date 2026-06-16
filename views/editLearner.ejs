@@ -1,0 +1,72 @@
+<% title = "Edit Learner"; %>
+<div class="row">
+  <div class="col-12 col-md-8 offset-md-2">
+    <div class="card">
+      <div class="card-header">
+        <h3>Edit Learner — <%= learner.name %></h3>
+      </div>
+      <div class="card-body">
+        <form action="/learners/<%= learner.id %>/edit" method="POST">
+          <div class="mb-3">
+            <label>Name</label>
+            <input name="name" value="<%= learner.name %>" class="form-control" />
+          </div>
+          <div class="mb-3">
+            <label>Assessment Number</label>
+            <input name="assessment_number" value="<%= learner.assessment_number %>" class="form-control" />
+          </div>
+          <div class="mb-3">
+            <label>Birth Certificate</label>
+            <input name="birth_certificate" value="<%= learner.birth_certificate || '' %>" class="form-control" />
+          </div>
+          <div class="mb-3">
+            <label>Grade</label>
+            <select name="grade" class="form-control">
+              <option value="">Select grade</option>
+              <% grades && grades.forEach(g => { %>
+                <option value="<%= g.name %>" <%= learner.grade === g.name ? 'selected' : '' %>><%= g.name %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label>Class Teacher</label>
+            <select name="class_teacher" class="form-control">
+              <option value="">Select class teacher</option>
+              <% teachers && teachers.forEach(t => { %>
+                <option value="<%= t.name %>" <%= learner.class_teacher === t.name ? 'selected' : '' %>><%= t.name %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label>Responsibility</label>
+            <input name="responsibility" value="<%= learner.responsibility || '' %>" class="form-control" />
+          </div>
+
+          <h5>Subject Scores (0-100)</h5>
+          <% const subjects = ['english','cre','pre_technical','integrated_science','agriculture','biology','mathematics','kiswahili','creative_arts','evrg']; %>
+          <% subjects.forEach(s => { %>
+            <div class="row mb-2">
+              <div class="col-4">
+                <label><%= s.replace(/_/g, ' ') %></label>
+                <input name="<%= s %>" value="<%= learner[s] || '' %>" class="form-control" />
+              </div>
+              <div class="col-4">
+                <label><%= s %> pl</label>
+                <input name="<%= s %>_pl" value="<%= learner[`${s}_pl`] || '' %>" class="form-control" />
+              </div>
+              <div class="col-4">
+                <label><%= s %> points</label>
+                <input name="<%= s %>_points" value="<%= learner[`${s}_points`] || '' %>" class="form-control" />
+              </div>
+            </div>
+          <% }) %>
+
+          <div class="d-flex gap-2 form-actions border-top pt-3">
+            <a href="/learners" class="btn btn-secondary">Cancel</a>
+            <button class="btn btn-primary">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

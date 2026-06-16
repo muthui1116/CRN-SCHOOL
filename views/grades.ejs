@@ -1,0 +1,56 @@
+<% title = "Grades"; %>
+<div class="row">
+  <div class="col-12 col-sm-12">
+    <div class="card shadow-sm border-0">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+          <h3 class="mb-1">Grades</h3>
+          <p class="mb-0 text-muted">Keep the grade catalog up to date and manage grade sections from a polished interface.</p>
+        </div>
+        <div class="d-flex gap-2 flex-wrap align-items-center">
+          <a href="/grades" class="btn btn-sm btn-outline-secondary">Refresh</a>
+          <a href="/grades/add" class="btn btn-sm btn-primary">Add Grade</a>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive rounded-3 shadow-sm">
+          <table class="table table-striped table-hover table-sm align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>ID</th>
+              <th>Grade</th>
+              <th>Enrolment</th>
+              <th>Class Teacher</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (!(grades||[]).length) { %>
+              <tr>
+                <td colspan="5" class="text-center text-muted py-4">No grades found. Add a grade to get started.</td>
+              </tr>
+            <% } else { %>
+              <% (grades||[]).forEach(g => { %>
+              <tr>
+                <td><%= g.id %></td>
+                <td><%= g.name || 'N/A' %></td>
+                <td><%= g.enrolment || '0' %></td>
+                <td><%= g.class_teacher || 'N/A' %></td>
+                <td class="table-actions">
+                  <div class="d-flex gap-1 flex-wrap">
+                    <a href="/grades/<%= g.id %>/edit" class="btn btn-sm btn-warning">Edit</a>
+                    <form action="/grades/delete/<%= g.id %>" method="POST" class="m-0">
+                      <button class="btn btn-sm btn-danger" onclick="return confirm('Delete this grade?')">Delete</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+              <% }) %>
+            <% } %>
+          </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

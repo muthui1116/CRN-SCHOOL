@@ -1,0 +1,78 @@
+<%- include('partials/header') %>
+
+<div class="container py-5">
+  <div class="card shadow-sm border-0">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h3 class="mb-1">Grade Homework Submission</h3>
+          <p class="text-muted mb-0">Assign marks and feedback for learner homework.</p>
+        </div>
+        <a href="/exams/homework/submissions" class="btn btn-outline-secondary btn-sm">Back to Submissions</a>
+      </div>
+
+      <div class="row gy-4">
+        <div class="col-12 col-lg-6">
+          <div class="card border-0 shadow-sm">
+            <div class="card-body">
+              <h5 class="card-title mb-3">Submission Details</h5>
+              <dl class="row mb-0">
+                <dt class="col-sm-5 text-muted">Learner</dt>
+                <dd class="col-sm-7"><%= submission.learner_name %></dd>
+
+                <dt class="col-sm-5 text-muted">Assessment #</dt>
+                <dd class="col-sm-7"><%= submission.assessment_number %></dd>
+
+                <dt class="col-sm-5 text-muted">Grade</dt>
+                <dd class="col-sm-7"><%= submission.homework_grade %></dd>
+
+                <dt class="col-sm-5 text-muted">Subject</dt>
+                <dd class="col-sm-7"><%= submission.subject || 'General' %></dd>
+
+                <dt class="col-sm-5 text-muted">Submitted</dt>
+                <dd class="col-sm-7"><%= new Date(submission.submitted_at).toLocaleDateString() %></dd>
+
+                <dt class="col-sm-5 text-muted">Answer</dt>
+                <dd class="col-sm-7">
+                  <% if (submission.answer_document_path) { %>
+                    <a href="/<%= submission.answer_document_path %>" class="btn btn-sm btn-outline-primary" download>
+                      <i class="fas fa-download me-1"></i>Download Answer
+                    </a>
+                  <% } else { %>
+                    None
+                  <% } %>
+                </dd>
+              </dl>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-lg-6">
+          <div class="card border-0 shadow-sm">
+            <div class="card-body">
+              <h5 class="card-title mb-3">Grade and Feedback</h5>
+              <form action="/exams/homework/submissions/<%= submission.submission_id %>/grade" method="POST">
+                <div class="mb-3">
+                  <label class="form-label fw-semibold">Score (0-100)</label>
+                  <input type="number" name="teacher_score" class="form-control form-control-sm" min="0" max="100" step="1" value="<%= submission.teacher_score !== null ? submission.teacher_score : '' %>" required>
+                  <div class="form-text">Enter a percentage score for this homework.</div>
+                </div>
+
+                <div class="mb-3">
+                  <label class="form-label fw-semibold">Feedback</label>
+                  <textarea name="teacher_feedback" class="form-control form-control-sm" rows="5" placeholder="Optional comments for the learner"><%= submission.teacher_feedback || '' %></textarea>
+                </div>
+
+                <button type="submit" class="btn btn-success">
+                  <i class="fas fa-save me-1"></i>Save Grade
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/footer') %>
