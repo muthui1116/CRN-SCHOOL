@@ -1,10 +1,32 @@
 
 
-<div class="marquee bg-primary bg-opacity-10 py-2">
-  <span class="text-primary small fw-medium">
-    🌱 Welcome to CRN-Tech &nbsp;&nbsp;|&nbsp;&nbsp; Free shipping on orders over $50 &nbsp;&nbsp;|&nbsp;&nbsp; New arrivals every week!
-  </span>
+<div class="marquee">
+  <div class="marquee-track">
+    <div class="marquee-group" id="marquee-group">
+      <span class="marquee-item text-primary">
+        <i class="bi bi-mortarboard-fill"></i>
+        Welcome to Kaithango Comprehensive School
+      </span>
+      <div class="marquee-sep"></div>
+      <span class="marquee-item text-success">
+        <i class="bi bi-lightbulb-fill"></i>
+        Education is power
+      </span>
+      <div class="marquee-sep"></div>
+      <span class="marquee-item text-secondary">
+        <i class="bi bi-people-fill"></i>
+        Preparing all-round individuals for today's contemporary society
+      </span>
+      <div class="marquee-sep"></div>
+    </div>
+    <div class="marquee-group" id="marquee-clone" aria-hidden="true"></div>
+  </div>
 </div>
+
+<script>
+  document.getElementById('marquee-clone').innerHTML =
+    document.getElementById('marquee-group').innerHTML;
+</script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>

@@ -2,20 +2,48 @@ h1{
     color: red;
 }
 
-.marquee {
-    white-space: nowrap;
+ .marquee {
     overflow: hidden;
+    padding: 0.6rem 0;
+    background-color: #f8f9fa; /* Bootstrap light bg */
+    border-top: 1px solid #dee2e6;
+    border-bottom: 1px solid #dee2e6;
+    mask-image: linear-gradient(to right, transparent 0%, black 6%, black 94%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, black 6%, black 94%, transparent 100%);
   }
-  
-  .marquee span {
-    display: inline-block;
-    animation: scroll 15s linear infinite;
+  .marquee-track {
+    display: flex;
+    width: max-content;
+    align-items: center;
+    animation: marquee-scroll 28s linear infinite;
   }
-  
-  @keyframes scroll {
-    from { transform: translateX(250%); }
-    to { transform: translateX(-100%); }
+  .marquee-track:hover { animation-play-state: paused; }
+  .marquee-group { display: flex; align-items: center; }
+  .marquee-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 2rem;
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
   }
+  .marquee-sep {
+    width: 1px;
+    height: 14px;
+    background: #ced4da;
+    flex-shrink: 0;
+  }
+  @keyframes marquee-scroll {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+  }
+
+@keyframes marquee-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
 
 /* Mobile-first responsive tweaks */
 img {

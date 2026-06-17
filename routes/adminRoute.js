@@ -27,6 +27,11 @@ export default function registerAdminRoutes(app) {
     res.render("addUser.ejs", { errors: [] });
   });
 
+  app.get("/users", isAuthenticated, isManager, (req, res) => {
+    // Keep users listing within the admin dashboard — redirect there
+    res.redirect("/admin");
+  });
+
   app.get("/admin", isAuthenticated, isManager, async (req, res) => {
     try {
       const result = await db.query("SELECT * FROM users ORDER BY id ASC");
