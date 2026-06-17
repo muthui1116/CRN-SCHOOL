@@ -11,7 +11,7 @@ const db = new pg.Pool({
     // password: process.env.DB_PASSWORD,
     // port: process.env.DB_PORT,
     connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    ssl: { rejectUnauthorized: false },
 });
 
 // Test the database connection
