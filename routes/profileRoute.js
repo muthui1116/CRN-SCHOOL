@@ -8,6 +8,11 @@ const saltRounds = 12;
 
 function isAuthenticated(req, res, next) {
   if (req.isAuthenticated()) return next();
+
+  if (req.accepts("json")) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
+
   res.redirect("/login");
 }
 

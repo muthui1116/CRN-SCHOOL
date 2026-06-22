@@ -120,39 +120,58 @@
               </a>
             </div>
 
-            <div class="table-responsive rounded-2">
-              <table class="table table-sm table-hover mb-0">
-                <thead class="table-light">
+            <div class="table-responsive rounded-2 homework-scroll-container">
+              <table class="table table-sm table-striped table-hover table-bordered mb-0 homework-table">
+                <thead class="table-dark">
                   <tr>
-                    <th>Learner</th>
-                    <th class="d-none d-md-table-cell">Assessment #</th>
-                    <th class="d-none d-lg-table-cell">Subject</th>
-                    <th class="d-none d-lg-table-cell">Submitted</th>
-                    <th>Answer</th>
-                    <th class="d-none d-md-table-cell">Feedback</th>
+                    <th style="min-width: 110px;" class="text-start">Learner</th>
+                    <th style="min-width: 90px;" class="text-center">Assessment #</th>
+                    <th style="min-width: 100px;" class="text-center">Subject</th>
+                    <th style="min-width: 95px;" class="text-center">Submitted</th>
+                    <th style="min-width: 110px;" class="text-center">Answer</th>
+                    <th style="min-width: 80px;" class="text-center">Feedback</th>
                   </tr>
                 </thead>
                 <tbody>
                   <% submittedHomework.forEach(hw => { %>
-                  <tr>
-                    <td><%= hw.learner_name || 'N/A' %></td>
-                    <td class="d-none d-md-table-cell"><%= hw.assessment_number || 'N/A' %></td>
-                    <td class="d-none d-lg-table-cell"><%= hw.subject ? hw.subject.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'General' %></td>
-                    <td class="d-none d-lg-table-cell"><%= hw.submitted_at ? new Date(hw.submitted_at).toLocaleDateString() : '—' %></td>
-                    <td>
+                  <tr class="align-middle">
+                    <td style="min-width: 110px;" class="text-start"><strong><%= hw.learner_name || 'N/A' %></strong></td>
+                    <td style="min-width: 90px;" class="text-center"><span class="badge bg-light text-dark"><%= hw.assessment_number || 'N/A' %></span></td>
+                    <td style="min-width: 100px;" class="text-center"><span class="badge bg-info"><%= hw.subject ? hw.subject.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'General' %></span></td>
+                    <td style="min-width: 95px;" class="text-center"><small class="text-muted"><%= hw.submitted_at ? new Date(hw.submitted_at).toLocaleDateString() : '—' %></small></td>
+                    <td style="min-width: 110px;" class="text-center">
                       <% if (hw.answer_document_path) { %>
-                        <a href="/<%= hw.answer_document_path %>" class="btn btn-sm btn-outline-secondary w-100 w-md-auto" download>
-                          <i class="fas fa-download me-1"></i>Download
+                        <a href="/<%= hw.answer_document_path %>" class="btn btn-sm btn-outline-success" download title="Download answer">
+                          <i class="fas fa-download me-1"></i><span class="d-none d-sm-inline">Download</span>
                         </a>
                       <% } else { %>
-                        —
+                        <span class="badge bg-secondary">No answer</span>
                       <% } %>
                     </td>
-                    <td class="d-none d-md-table-cell"><%= hw.teacher_feedback ? 'Yes' : 'No' %></td>
+                    <td style="min-width: 80px;" class="text-center">
+                      <% if (hw.teacher_feedback) { %>
+                        <span class="badge bg-success">Yes</span>
+                      <% } else { %>
+                        <span class="badge bg-warning text-dark">No</span>
+                      <% } %>
+                    </td>
                   </tr>
                   <% }) %>
                 </tbody>
               </table>
+            </div>
+
+            <!-- Custom horizontal scrollbar for small screens -->
+            <div class="custom-scrollbar-container d-md-none mt-2">
+              <button class="custom-scroll-left" aria-label="Scroll left">
+                <i class="fas fa-chevron-left"></i>
+              </button>
+              <div class="custom-scrollbar-track">
+                <div class="custom-scrollbar-thumb"></div>
+              </div>
+              <button class="custom-scroll-right" aria-label="Scroll right">
+                <i class="fas fa-chevron-right"></i>
+              </button>
             </div>
           </div>
         </div>
@@ -179,7 +198,7 @@
                   <th colspan="3" class="text-center border-start subject-header">Mathematics</th>
                   <th colspan="3" class="text-center border-start subject-header">Int. Science</th>
                   <th colspan="3" class="text-center border-start subject-header">Agriculture</th>
-                  <th colspan="3" class="text-center border-start subject-header">Biology</th>
+                  <th colspan="3" class="text-center border-start subject-header">Social Studies</th>
                   <th colspan="3" class="text-center border-start subject-header">CRE</th>
                   <th colspan="3" class="text-center border-start subject-header">Pre-Technical</th>
                   <th colspan="3" class="text-center border-start subject-header">Creative Arts</th>
@@ -234,10 +253,10 @@
                   <td class="text-center"><span class="grade-badge"><%= l.agriculture_pl || '—' %></span></td>
                   <td class="text-center"><%= l.agriculture_points || '—' %></td>
 
-                  <!-- Biology -->
-                  <td class="text-center border-start"><%= l.biology || '—' %></td>
-                  <td class="text-center"><span class="grade-badge"><%= l.biology_pl || '—' %></span></td>
-                  <td class="text-center"><%= l.biology_points || '—' %></td>
+                  <!-- social_studies -->
+                  <td class="text-center border-start"><%= l.social_studies || '—' %></td>
+                  <td class="text-center"><span class="grade-badge"><%= l.social_studies_pl || '—' %></span></td>
+                  <td class="text-center"><%= l.social_studies_points || '—' %></td>
 
                   <!-- CRE -->
                   <td class="text-center border-start"><%= l.cre || '—' %></td>
@@ -392,6 +411,161 @@
     font-weight: 600;
     color: #495057;
   }
+
+  /* Homework table responsive scrolling */
+  .table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    overflow-y: visible;
+  }
+  
+  .table-responsive.rounded-2 {
+    border-radius: 0.25rem;
+    overflow: hidden;
+  }
+
+  .homework-table {
+    font-size: 13px;
+  }
+
+  .homework-table thead th {
+    white-space: nowrap;
+    font-weight: 600;
+    background-color: #212529;
+    color: white;
+    border-bottom: 2px solid #dee2e6;
+    padding: 0.65rem 0.5rem;
+  }
+
+  .homework-table tbody td {
+    vertical-align: middle;
+    padding: 0.6rem 0.5rem;
+    border-color: #e9ecef;
+  }
+
+  .homework-table tbody tr {
+    transition: background-color 0.2s ease;
+  }
+
+  .homework-table tbody tr:hover {
+    background-color: #f8f9fa;
+  }
+
+  .homework-table .badge {
+    font-size: 10px;
+    padding: 0.4rem 0.6rem;
+    font-weight: 500;
+  }
+
+  .homework-table .btn-sm {
+    padding: 0.4rem 0.6rem;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .homework-table .btn-outline-success {
+    border-color: #198754;
+    color: #198754;
+  }
+
+  .homework-table .btn-outline-success:hover {
+    background-color: #198754;
+    border-color: #198754;
+    color: white;
+  }
+
+  /* Custom horizontal scrollbar */
+  .custom-scrollbar-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+  }
+
+  .custom-scroll-left,
+  .custom-scroll-right {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    color: #495057;
+    padding: 6px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+
+  .custom-scroll-left:hover,
+  .custom-scroll-right:hover {
+    background: #0d6efd;
+    color: white;
+    border-color: #0d6efd;
+  }
+
+  .custom-scrollbar-track {
+    flex: 1;
+    height: 20px;
+    background: #f0f0f0;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    position: relative;
+    cursor: pointer;
+  }
+
+  .custom-scrollbar-thumb {
+    height: 100%;
+    background: #6c757d;
+    border-radius: 3px;
+    cursor: grab;
+    min-width: 40px;
+    transition: background 0.2s ease;
+  }
+
+  .custom-scrollbar-thumb:hover {
+    background: #495057;
+  }
+
+  .custom-scrollbar-thumb.dragging {
+    background: #0d6efd;
+    cursor: grabbing;
+  }
+
+  @media (max-width: 768px) {
+    .table-responsive {
+      margin-bottom: 1rem;
+    }
+    .table-responsive > .table {
+      margin-bottom: 0;
+    }
+    .homework-table {
+      font-size: 11px;
+    }
+    .homework-table thead th {
+      padding: 0.45rem 0.3rem;
+      font-size: 9px;
+    }
+    .homework-table tbody td {
+      padding: 0.35rem 0.3rem;
+      white-space: nowrap;
+    }
+    .homework-table th,
+    .homework-table td {
+      min-width: auto !important;
+    }
+    .homework-table .badge {
+      font-size: 8px;
+      padding: 0.3rem 0.4rem;
+    }
+    .btn-sm {
+      padding: 0.25rem 0.4rem;
+      font-size: 8px;
+    }
+    .btn-sm .fa {
+      font-size: 8px;
+      margin-right: 2px !important;
+    }
+  }
+
   .homework-action-btn {
     min-width: auto;
     font-weight: 600;
@@ -434,6 +608,86 @@
       badge.className = `ms-2 badge bg-${cls || 'secondary'}`;
     });
   });
+
+  // Custom horizontal scrollbar for homework table
+  const scrollContainer = document.querySelector('.homework-scroll-container');
+  const scrollTrack = document.querySelector('.custom-scrollbar-track');
+  const scrollThumb = document.querySelector('.custom-scrollbar-thumb');
+  const scrollLeftBtn = document.querySelector('.custom-scroll-left');
+  const scrollRightBtn = document.querySelector('.custom-scroll-right');
+
+  if (scrollContainer && scrollTrack && scrollThumb) {
+    const scrollAmount = 300;
+    let isDragging = false;
+    let startX = 0;
+    let thumbStartX = 0;
+
+    const updateThumbPosition = () => {
+      if (!scrollContainer) return;
+      const scrollPercentage = scrollContainer.scrollLeft / (scrollContainer.scrollWidth - scrollContainer.clientWidth);
+      const trackWidth = scrollTrack.clientWidth;
+      const thumbWidth = scrollThumb.offsetWidth;
+      const maxThumbPosition = trackWidth - thumbWidth;
+      scrollThumb.style.left = (scrollPercentage * maxThumbPosition) + 'px';
+    };
+
+    // Update thumb when table scrolls
+    scrollContainer.addEventListener('scroll', updateThumbPosition);
+
+    // Click on track to jump to position
+    scrollTrack.addEventListener('click', (e) => {
+      const rect = scrollTrack.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const trackWidth = scrollTrack.clientWidth;
+      const thumbWidth = scrollThumb.offsetWidth;
+      const maxThumbPosition = trackWidth - thumbWidth;
+      const thumbPosition = Math.max(0, Math.min(clickX - thumbWidth / 2, maxThumbPosition));
+      const scrollPercentage = thumbPosition / maxThumbPosition;
+      scrollContainer.scrollLeft = scrollPercentage * (scrollContainer.scrollWidth - scrollContainer.clientWidth);
+    });
+
+    // Dragging the thumb
+    scrollThumb.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      startX = e.clientX;
+      thumbStartX = scrollThumb.offsetLeft;
+      scrollThumb.classList.add('dragging');
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      const deltaX = e.clientX - startX;
+      const trackWidth = scrollTrack.clientWidth;
+      const thumbWidth = scrollThumb.offsetWidth;
+      const maxThumbPosition = trackWidth - thumbWidth;
+      const newThumbPosition = Math.max(0, Math.min(thumbStartX + deltaX, maxThumbPosition));
+      const scrollPercentage = newThumbPosition / maxThumbPosition;
+      scrollContainer.scrollLeft = scrollPercentage * (scrollContainer.scrollWidth - scrollContainer.clientWidth);
+    });
+
+    document.addEventListener('mouseup', () => {
+      isDragging = false;
+      scrollThumb.classList.remove('dragging');
+    });
+
+    // Arrow button scrolling
+    if (scrollLeftBtn) {
+      scrollLeftBtn.addEventListener('click', () => {
+        scrollContainer.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
+      });
+    }
+
+    if (scrollRightBtn) {
+      scrollRightBtn.addEventListener('click', () => {
+        scrollContainer.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+      });
+    }
+
+    // Initial position update
+    updateThumbPosition();
+  }
 </script>
 
 <%- include('partials/footer') %>
+
+

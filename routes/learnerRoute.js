@@ -1,5 +1,6 @@
 import db from "../db.js";
 import path from "path";
+import homeworkUpload from "../homeworkUpload.js";
 
 function isAuthenticated(req, res, next) {
   if (req.isAuthenticated && req.isAuthenticated()) {
@@ -275,21 +276,14 @@ export default function registerLearnerRoutes(app) {
   });
 
   // Submit homework answer
-  app.post("/learner/homework/:id/submit", isAuthenticated, isLearner, async (req, res) => {
-    const answerUploadModule = (await import("../homeworkUpload.js")).default;
-
-    return answerUploadModule.single("answer_document")(req, res, async (err) => {
-      if (err) {
-        return res.render("error.ejs", { message: err.message });
+  app.post("/learner/homework/:id/submit", isAuthenticated, isLearner, homeworkUpload.single("answer_document"), async (req, res) => {
+      if (!req.file) {
+        return res.render("error.ejs", { message: "Document upload is required." });
       }
 
       try {
         const { id: homeworkId } = req.params;
-        const answerDocumentPath = req.file ? path.posix.join('uploads/homework', req.file.filename) : null;
-
-        if (!answerDocumentPath) {
-          return res.render("error.ejs", { message: "Document upload is required." });
-        }
+        const answerDocumentPath = path.posix.join('uploads/homework', req.file.filename);
 
         const userResult = await db.query(
           "SELECT id, assessment_number, name FROM users WHERE id = $1",
@@ -332,5 +326,4 @@ export default function registerLearnerRoutes(app) {
         res.render("error.ejs", { message: "Error submitting homework." });
       }
     });
-  });
 }

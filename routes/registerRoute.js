@@ -1,19 +1,11 @@
 import passport from "../passportConfig.js";
 import db from "../db.js";
 import bcrypt from "bcrypt";
-import nodemailer from "nodemailer";
 import crypto from "crypto";
+import nodemailer from "nodemailer";
 import path from "path";
 import fs from "fs";
 import upload from "../multer.js";
-import { validateSubjectScores } from "../utils/gradeUtils.js";
-import registerAdminRoutes from "./adminRoute.js";
-import { fileURLToPath } from "url";
-import { fetchTeachersList } from "../utils/teacherUtils.js";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 const saltRounds = 12;
 
 export default function registerRoutes(app) {
@@ -103,14 +95,6 @@ export default function registerRoutes(app) {
     return res.status(403).send("Access denied. Teacher privileges required.");
   }
 
-  // Middleware to check if user is learner (role 3) =========================
-  function isLearner(req, res, next) {
-    if (req.isAuthenticated() && req.user && req.user.role === 3) {
-      return next();
-    }
-    return res.status(403).send("Access denied. Learner privileges required.");
-  }
-
   // ─── Auth Guard (open after login) ─────────────────────────────────
   function isAuthenticated(req, res, next) {
     if (req.isAuthenticated()) return next();
@@ -172,6 +156,151 @@ export default function registerRoutes(app) {
 
   app.get("/login", (req, res) => {
     res.render("login.ejs");
+  });
+
+  app.get("/forgot-password", (req, res) => {
+    res.render("forgot-password.ejs");
+  });
+
+  app.post("/forgot-password", async (req, res) => {
+    const { email } = req.body;
+    if (!email) {
+      return res.render("forgot-password.ejs", { error: "Email is required." });
+    }
+
+    try {
+      const { rows } = await db.query(
+        "SELECT id, email FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1",
+        [email],
+      );
+
+      const token = crypto.randomBytes(24).toString("hex");
+      const expires = new Date(Date.now() + 1000 * 60 * 60);
+
+      if (rows.length > 0) {
+        await db.query(
+          `UPDATE users SET reset_token = $1, reset_token_expires = $2 WHERE id = $3`,
+          [token, expires, rows[0].id],
+        );
+
+        const resetLink = `${req.protocol}://${req.get("host")}/reset-password?token=${token}`;
+
+        const transporter = nodemailer.createTransport({
+          host: process.env.EMAIL_HOST,
+          port: Number(process.env.EMAIL_PORT) || 587,
+          secure: process.env.EMAIL_SECURE === "true",
+          auth: {
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASS,
+          },
+        });
+
+        const mailOptions = {
+          from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+          to: rows[0].email,
+          subject: "Password Reset Request",
+          text: `You requested a password reset. Use the link below to reset your password:\n\n${resetLink}`,
+          html: `<p>You requested a password reset.</p><p>Click the link below to reset your password:</p><p><a href="${resetLink}">${resetLink}</a></p>`,
+        };
+
+        await transporter.sendMail(mailOptions);
+      }
+
+      return res.render("forgot-password.ejs", {
+        success: "If that email is registered, a password reset link has been sent.",
+      });
+    } catch (err) {
+      console.error("Forgot password error:", err.message);
+      res.status(500).render("forgot-password.ejs", {
+        error: "Unable to process the password reset request.",
+      });
+    }
+  });
+
+  app.get("/reset-password", async (req, res) => {
+    const { token } = req.query;
+    if (!token) {
+      return res.render("reset-password.ejs", {
+        error: "Reset token is required.",
+      });
+    }
+
+    try {
+      const { rows } = await db.query(
+        `SELECT id FROM users WHERE reset_token = $1 AND reset_token_expires > now() LIMIT 1`,
+        [token],
+      );
+
+      if (rows.length === 0) {
+        return res.render("reset-password.ejs", {
+          error: "Invalid or expired reset link.",
+        });
+      }
+
+      res.render("reset-password.ejs", {
+        tokenValid: true,
+        token,
+      });
+    } catch (err) {
+      console.error("Reset password page error:", err.message);
+      res.status(500).render("reset-password.ejs", {
+        error: "Unable to load reset page.",
+      });
+    }
+  });
+
+  app.post("/reset-password", async (req, res) => {
+    const { token, new_password, confirm_password } = req.body;
+
+    if (!token) {
+      return res.render("reset-password.ejs", {
+        error: "Reset token is required.",
+      });
+    }
+
+    if (!new_password || !confirm_password) {
+      return res.render("reset-password.ejs", {
+        error: "Please provide a new password and confirm it.",
+        tokenValid: true,
+        token,
+      });
+    }
+
+    if (new_password !== confirm_password) {
+      return res.render("reset-password.ejs", {
+        error: "Passwords do not match.",
+        tokenValid: true,
+        token,
+      });
+    }
+
+    try {
+      const { rows } = await db.query(
+        `SELECT id FROM users WHERE reset_token = $1 AND reset_token_expires > now() LIMIT 1`,
+        [token],
+      );
+
+      if (rows.length === 0) {
+        return res.render("reset-password.ejs", {
+          error: "Invalid or expired reset link.",
+        });
+      }
+
+      const hashedPassword = await bcrypt.hash(new_password, saltRounds);
+      await db.query(
+        `UPDATE users SET password = $1, reset_token = NULL, reset_token_expires = NULL WHERE id = $2`,
+        [hashedPassword, rows[0].id],
+      );
+
+      res.render("reset-password.ejs", {
+        success: "Your password has been reset successfully.",
+      });
+    } catch (err) {
+      console.error("Reset password submit error:", err.message);
+      res.status(500).render("reset-password.ejs", {
+        error: "Unable to reset your password.",
+      });
+    }
   });
 
   app.get("/add-user", (req, res) => {
@@ -446,7 +575,4 @@ export default function registerRoutes(app) {
       }
     },
   );
-
-  // Register admin routes
-  registerAdminRoutes(app, isAuthenticated, isManager, fetchTeachersList);
 }

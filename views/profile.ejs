@@ -6,6 +6,11 @@
     <div class="col-lg-3 mb-4">
       <div class="card shadow-sm sticky-top" style="top: 100px;">
         <div class="card-body text-center">
+            <div class="d-grid gap-2">
+            <a href="#" onclick="history.back(); return false;" class="btn btn-sm btn-outline-secondary">
+              <i class="fas fa-arrow-left"></i> Back
+            </a>
+          </div>
           <!-- Profile Image -->
           <div class="col-md-6 text-center">
   <label class="form-label text-muted small d-block mb-2">Current Image:</label>
@@ -63,14 +68,7 @@
             </span>
           <% } %>
 
-          <div class="d-grid gap-2">
-            <a href="/" class="btn btn-sm btn-outline-primary">
-              <i class="fas fa-shopping-bag"></i> Continue Shopping
-            </a>
-            <a href="/my-orders" class="btn btn-sm btn-outline-secondary">
-              <i class="fas fa-history"></i> Order History
-            </a>
-          </div>
+        
         </div>
       </div>
     </div>
@@ -698,7 +696,10 @@ function handleImageRemove() {
     try {
       const response = await fetch('/profile/change-password', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({
           current_password: document.getElementById('current_password').value,
           new_password: new_password,

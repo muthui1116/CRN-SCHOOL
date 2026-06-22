@@ -16,6 +16,10 @@
             <input name="assessment_number" value="<%= learner.assessment_number %>" class="form-control" />
           </div>
           <div class="mb-3">
+            <label>ADN No</label>
+            <input name="adn_no" value="<%= learner.adn_no || '' %>" class="form-control" />
+          </div>
+          <div class="mb-3">
             <label>Birth Certificate</label>
             <input name="birth_certificate" value="<%= learner.birth_certificate || '' %>" class="form-control" />
           </div>
@@ -43,7 +47,7 @@
           </div>
 
           <h5>Subject Scores (0-100)</h5>
-          <% const subjects = ['english','cre','pre_technical','integrated_science','agriculture','biology','mathematics','kiswahili','creative_arts','evrg']; %>
+          <% const subjects = ['english','cre','pre_technical','integrated_science','agriculture','social_studies','mathematics','kiswahili','creative_arts','evrg']; %>
           <% subjects.forEach(s => { %>
             <div class="row mb-2">
               <div class="col-4">
@@ -70,3 +74,5 @@
     </div>
   </div>
 </div>
+
+

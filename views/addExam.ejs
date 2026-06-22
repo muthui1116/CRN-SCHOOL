@@ -24,7 +24,7 @@
                 <option value="" disabled>No learners found for this grade.</option>
               <% } else { %>
                 <% learners.forEach(l => { %>
-                  <option value="<%= l.id %>"><%= l.name %> (<%= l.assessment_number || 'No assessment #' %>)</option>
+                  <option value="<%= l.id %>" <%= selectedLearnerId && String(selectedLearnerId) === String(l.id) ? 'selected' : '' %>><%= l.name %> (<%= l.assessment_number || 'No assessment #' %>)</option>
                 <% }) %>
               <% } %>
             </select>
@@ -50,7 +50,7 @@
                 { key: 'mathematics', label: 'Mathematics' },
                 { key: 'integrated_science', label: 'Integrated Science' },
                 { key: 'agriculture', label: 'Agriculture' },
-                { key: 'biology', label: 'Biology' },
+                { key: 'social_studies', label: 'Social Studies' },
                 { key: 'cre', label: 'CRE' },
                 { key: 'pre_technical', label: 'Pre-Technical' },
                 { key: 'creative_arts', label: 'Creative Arts' }
@@ -82,8 +82,10 @@
       </form>
 
       <script>
-        const subjectKeys = ['english','kiswahili','mathematics','integrated_science','agriculture','biology','cre','pre_technical','creative_arts'];
-        const learnersData ="<%- JSON.stringify(typeof learners !== 'undefined' ? learners : []) %>";
+        const subjectKeys = ['english','kiswahili','mathematics','integrated_science','agriculture','social_studies','cre','pre_technical','creative_arts'];
+        const learnersData = "<%- JSON.stringify(typeof learners !== 'undefined' ? learners : []) %>";
+        const gradeValue = "<%= grade %>";
+        const selectedTermValue = "<%= selectedTerm %>";
         const learnerSelect = document.querySelector('[name="learner_id"]');
 
         const parseScore = value => {
@@ -98,6 +100,50 @@
           const scoreCat2 = cat2 || 0;
           const scoreMain = main || 0;
           return Math.round((scoreCat1 / 100) * 15 + (scoreCat2 / 100) * 15 + (scoreMain / 100) * 70);
+        };
+
+        const getStateKey = () => {
+          const learnerId = learnerSelect ? learnerSelect.value || 'none' : 'none';
+          return `exam_add_${gradeValue}_${selectedTermValue}_${learnerId}`;
+        };
+
+        const saveFormState = () => {
+          const state = { learner_id: learnerSelect ? learnerSelect.value : null, values: {} };
+          subjectKeys.forEach(subject => {
+            state.values[`${subject}_cat1`] = document.querySelector(`input[name="${subject}_cat1"]`)?.value || '';
+            state.values[`${subject}_cat2`] = document.querySelector(`input[name="${subject}_cat2"]`)?.value || '';
+            state.values[`${subject}_main`] = document.querySelector(`input[name="${subject}_main"]`)?.value || '';
+          });
+          localStorage.setItem(getStateKey(), JSON.stringify(state));
+        };
+
+        const loadFormState = () => {
+          const saved = localStorage.getItem(getStateKey());
+          if (!saved) return false;
+          try {
+            const state = JSON.parse(saved);
+            if (learnerSelect && state.learner_id) {
+              learnerSelect.value = state.learner_id;
+            }
+            subjectKeys.forEach(subject => {
+              const cat1 = document.querySelector(`input[name="${subject}_cat1"]`);
+              const cat2 = document.querySelector(`input[name="${subject}_cat2"]`);
+              const main = document.querySelector(`input[name="${subject}_main"]`);
+              if (!cat1 || !cat2 || !main) return;
+              cat1.value = state.values[`${subject}_cat1`] || '';
+              cat2.value = state.values[`${subject}_cat2`] || '';
+              main.value = state.values[`${subject}_main`] || '';
+            });
+            updateFinal();
+            return true;
+          } catch (err) {
+            console.error('Failed to restore form state', err);
+            return false;
+          }
+        };
+
+        const clearFormState = () => {
+          localStorage.removeItem(getStateKey());
         };
 
         const updateFinal = () => {
@@ -130,6 +176,7 @@
             }
           });
           updateFinal();
+          saveFormState();
         };
 
         if (learnerSelect) {
@@ -139,11 +186,45 @@
         }
 
         document.querySelectorAll('.occasion-input').forEach(input => {
-          input.addEventListener('input', updateFinal);
+          input.addEventListener('input', () => {
+            updateFinal();
+            saveFormState();
+          });
         });
+
+        const tryRestore = () => {
+          const params = new URLSearchParams(window.location.search);
+          const learnerId = params.get('learner_id');
+          if (learnerSelect && learnerId) {
+            learnerSelect.value = learnerId;
+            populateLearnerScores(learnerId);
+          }
+          loadFormState();
+        };
 
         if (learnerSelect && learnerSelect.value) {
           populateLearnerScores(learnerSelect.value);
+          loadFormState();
+        } else if (window.location.search.includes('learner_id=')) {
+          tryRestore();
+        }
+
+        const form = document.querySelector('form');
+        if (form) {
+          form.addEventListener('submit', event => {
+            const learnerId = learnerSelect ? learnerSelect.value : null;
+            if (!learnerId) {
+              return;
+            }
+            // preserve the form state until redirect back to the add page
+            const state = { learner_id: learnerId, values: {} };
+            subjectKeys.forEach(subject => {
+              state.values[`${subject}_cat1`] = document.querySelector(`input[name="${subject}_cat1"]`)?.value || '';
+              state.values[`${subject}_cat2`] = document.querySelector(`input[name="${subject}_cat2"]`)?.value || '';
+              state.values[`${subject}_main`] = document.querySelector(`input[name="${subject}_main"]`)?.value || '';
+            });
+            localStorage.setItem(getStateKey(), JSON.stringify(state));
+          });
         }
       </script>
     </div>
@@ -151,3 +232,4 @@
 </div>
 
 <%- include('partials/footer') %>
+

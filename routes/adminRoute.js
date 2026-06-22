@@ -388,13 +388,14 @@ export default function registerAdminRoutes(app) {
 
   app.post("/learners/add", isAuthenticated, isManager, async (req, res) => {
     try {
-      const { name, assessment_number, birth_certificate, grade, class_teacher, responsibility } =
+      const { name, assessment_number, adn_no, birth_certificate, grade, class_teacher, responsibility } =
         req.body;
       await db.query(
-        `INSERT INTO learners (name, assessment_number, birth_certificate, grade, class_teacher, responsibility) VALUES ($1, $2, $3, $4, $5, $6)`,
+        `INSERT INTO learners (name, assessment_number, adn_no, birth_certificate, grade, class_teacher, responsibility) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [
           name || null,
           assessment_number || null,
+          adn_no || null,
           birth_certificate || null,
           grade || null,
           class_teacher || null,
@@ -453,6 +454,7 @@ export default function registerAdminRoutes(app) {
             [
               "name",
               "assessment_number",
+              "adn_no",
               "birth_certificate",
               "grade",
               "class_teacher",
@@ -472,9 +474,9 @@ export default function registerAdminRoutes(app) {
               "agriculture",
               "agriculture_pl",
               "agriculture_points",
-              "biology",
-              "biology_pl",
-              "biology_points",
+              "social_studies",
+              "social_studies_pl",
+              "social_studies_points",
               "mathematics",
               "mathematics_pl",
               "mathematics_points",
@@ -801,3 +803,4 @@ export default function registerAdminRoutes(app) {
     },
   );
 }
+

@@ -4,7 +4,6 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "migrate:learner-results": "node migrations/migrateLearnersToLearnerResults.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -13,17 +12,16 @@
   "type": "module",
   "dependencies": {
     "bcrypt": "^6.0.0",
-    "crypto": "^1.0.1",
     "dotenv": "^17.4.2",
     "ejs": "^5.0.2",
     "express": "^5.2.1",
     "express-rate-limit": "^8.3.2",
     "express-session": "^1.19.0",
     "multer": "^2.1.1",
-    "nodemailer": "^8.0.10",
     "passport": "^0.7.0",
     "passport-google-oauth2": "^0.2.0",
     "passport-local": "^1.0.0",
-    "pg": "^8.20.0"
+    "pg": "^8.20.0",
+    "nodemailer": "^6.9.4"
   }
 }

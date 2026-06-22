@@ -107,10 +107,10 @@
                     <td><%= learnerRecord.agriculture_points || '—' %> pts</td>
                   </tr>
                   <tr>
-                    <td class="fw-semibold">Biology</td>
-                    <td><%= learnerRecord.biology || '—' %></td>
-                    <td><span class="badge bg-info"><%= learnerRecord.biology_pl || '—' %></span></td>
-                    <td><%= learnerRecord.biology_points || '—' %> pts</td>
+                    <td class="fw-semibold">Social Studies</td>
+                    <td><%= learnerRecord.social_studies || '—' %></td>
+                    <td><span class="badge bg-info"><%= learnerRecord.social_studies_pl || '—' %></span></td>
+                    <td><%= learnerRecord.social_studies_points || '—' %> pts</td>
                   </tr>
                   <tr>
                     <td class="fw-semibold">CRE</td>
@@ -178,10 +178,10 @@
                           <div class="small text-muted"><%= learnerRecord.agriculture_points || '—' %> pts</div>
                         </div>
                         <div class="col">
-                          <small class="d-block text-muted">Biology</small>
-                          <div><strong><%= learnerRecord.biology || '—' %></strong></div>
-                          <small><span class="badge bg-info"><%= learnerRecord.biology_pl || '—' %></span></small>
-                          <div class="small text-muted"><%= learnerRecord.biology_points || '—' %> pts</div>
+                          <small class="d-block text-muted">Social Studies</small>
+                          <div><strong><%= learnerRecord.social_studies || '—' %></strong></div>
+                          <small><span class="badge bg-info"><%= learnerRecord.social_studies_pl || '—' %></span></small>
+                          <div class="small text-muted"><%= learnerRecord.social_studies_points || '—' %> pts</div>
                         </div>
                         <div class="col">
                           <small class="d-block text-muted">CRE</small>
@@ -289,3 +289,5 @@
     background-color: rgba(13, 110, 253, 0.1);
   }
 </style>
+
+

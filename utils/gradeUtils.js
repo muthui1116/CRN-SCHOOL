@@ -5,7 +5,7 @@ export function validateSubjectScores(body) {
     "pre_technical",
     "integrated_science",
     "agriculture",
-    "biology",
+    "social_studies",
     "mathematics",
     "kiswahili",
     "creative_arts",
@@ -28,3 +28,5 @@ export function validateSubjectScores(body) {
   }
   return { valid: true };
 }
+
+

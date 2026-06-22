@@ -24,7 +24,7 @@ const examSubjectDefinitions = [
   { key: 'mathematics', label: 'Mathematics' },
   { key: 'integrated_science', label: 'Integrated Science' },
   { key: 'agriculture', label: 'Agriculture' },
-  { key: 'biology', label: 'Biology' },
+  { key: 'social_studies', label: 'Social Studies' },
   { key: 'cre', label: 'CRE' },
   { key: 'pre_technical', label: 'Pre-Technical' },
   { key: 'creative_arts', label: 'Creative Arts' }
@@ -44,7 +44,7 @@ export default function registerExamRoutes(app) {
                 lr.mathematics, lr.mathematics_pl, lr.mathematics_points, lr.mathematics_cat1, lr.mathematics_cat2, lr.mathematics_main,
                 lr.integrated_science, lr.integrated_science_pl, lr.integrated_science_points, lr.integrated_science_cat1, lr.integrated_science_cat2, lr.integrated_science_main,
                 lr.agriculture, lr.agriculture_pl, lr.agriculture_points, lr.agriculture_cat1, lr.agriculture_cat2, lr.agriculture_main,
-                lr.biology, lr.biology_pl, lr.biology_points, lr.biology_cat1, lr.biology_cat2, lr.biology_main,
+                lr.social_studies AS social_studies, lr.social_studies_pl AS social_studies_pl, lr.social_studies_points AS social_studies_points, lr.social_studies_cat1 AS social_studies_cat1, lr.social_studies_cat2 AS social_studies_cat2, lr.social_studies_main AS social_studies_main,
                 lr.cre, lr.cre_pl, lr.cre_points, lr.cre_cat1, lr.cre_cat2, lr.cre_main,
                 lr.pre_technical, lr.pre_technical_pl, lr.pre_technical_points, lr.pre_technical_cat1, lr.pre_technical_cat2, lr.pre_technical_main,
                 lr.creative_arts, lr.creative_arts_pl, lr.creative_arts_points, lr.creative_arts_cat1, lr.creative_arts_cat2, lr.creative_arts_main,
@@ -103,8 +103,9 @@ export default function registerExamRoutes(app) {
   });
 
   app.get('/exams/add', isAuthenticated, isTeacher, async (req, res) => {
-    const { grade, term } = req.query;
+    const { grade, term, learner_id } = req.query;
     const selectedTerm = ["1", "2", "3"].includes(term) ? term : "1";
+    const selectedLearnerId = learner_id || null;
     let result;
     if (grade) {
       const normalizedGrade = grade.toString().trim();
@@ -115,7 +116,7 @@ export default function registerExamRoutes(app) {
                 lr.mathematics, lr.mathematics_pl, lr.mathematics_points, lr.mathematics_cat1, lr.mathematics_cat2, lr.mathematics_main,
                 lr.integrated_science, lr.integrated_science_pl, lr.integrated_science_points, lr.integrated_science_cat1, lr.integrated_science_cat2, lr.integrated_science_main,
                 lr.agriculture, lr.agriculture_pl, lr.agriculture_points, lr.agriculture_cat1, lr.agriculture_cat2, lr.agriculture_main,
-                lr.biology, lr.biology_pl, lr.biology_points, lr.biology_cat1, lr.biology_cat2, lr.biology_main,
+                lr.social_studies AS social_studies, lr.social_studies_pl AS social_studies_pl, lr.social_studies_points AS social_studies_points, lr.social_studies_cat1 AS social_studies_cat1, lr.social_studies_cat2 AS social_studies_cat2, lr.social_studies_main AS social_studies_main,
                 lr.cre, lr.cre_pl, lr.cre_points, lr.cre_cat1, lr.cre_cat2, lr.cre_main,
                 lr.pre_technical, lr.pre_technical_pl, lr.pre_technical_points, lr.pre_technical_cat1, lr.pre_technical_cat2, lr.pre_technical_main,
                 lr.creative_arts, lr.creative_arts_pl, lr.creative_arts_points, lr.creative_arts_cat1, lr.creative_arts_cat2, lr.creative_arts_main,
@@ -134,7 +135,7 @@ export default function registerExamRoutes(app) {
                 lr.mathematics, lr.mathematics_pl, lr.mathematics_points, lr.mathematics_cat1, lr.mathematics_cat2, lr.mathematics_main,
                 lr.integrated_science, lr.integrated_science_pl, lr.integrated_science_points, lr.integrated_science_cat1, lr.integrated_science_cat2, lr.integrated_science_main,
                 lr.agriculture, lr.agriculture_pl, lr.agriculture_points, lr.agriculture_cat1, lr.agriculture_cat2, lr.agriculture_main,
-                lr.biology, lr.biology_pl, lr.biology_points, lr.biology_cat1, lr.biology_cat2, lr.biology_main,
+                lr.social_studies AS social_studies, lr.social_studies_pl AS social_studies_pl, lr.social_studies_points AS social_studies_points, lr.social_studies_cat1 AS social_studies_cat1, lr.social_studies_cat2 AS social_studies_cat2, lr.social_studies_main AS social_studies_main,
                 lr.cre, lr.cre_pl, lr.cre_points, lr.cre_cat1, lr.cre_cat2, lr.cre_main,
                 lr.pre_technical, lr.pre_technical_pl, lr.pre_technical_points, lr.pre_technical_cat1, lr.pre_technical_cat2, lr.pre_technical_main,
                 lr.creative_arts, lr.creative_arts_pl, lr.creative_arts_points, lr.creative_arts_cat1, lr.creative_arts_cat2, lr.creative_arts_main,
@@ -145,12 +146,13 @@ export default function registerExamRoutes(app) {
         [selectedTerm]
       );
     }
-    res.render('addExam.ejs', { grade: grade || null, selectedTerm, learners: result.rows });
+    res.render('addExam.ejs', { grade: grade || null, selectedTerm, learners: result.rows, selectedLearnerId });
   });
 
   app.post('/exams/add', isAuthenticated, isTeacher, async (req, res) => {
-    const { learner_id, term } = req.body;
+    const { learner_id, term, grade } = req.body;
     const selectedTerm = ["1", "2", "3"].includes(term) ? term : "1";
+    const selectedGrade = grade || null;
     const subjectKeys = examSubjectKeys;
 
     const parseRawMark = value => {
@@ -224,7 +226,7 @@ export default function registerExamRoutes(app) {
           mathematics_cat1, mathematics_cat2, mathematics_main, mathematics, mathematics_pl, mathematics_points,
           integrated_science_cat1, integrated_science_cat2, integrated_science_main, integrated_science, integrated_science_pl, integrated_science_points,
           agriculture_cat1, agriculture_cat2, agriculture_main, agriculture, agriculture_pl, agriculture_points,
-          biology_cat1, biology_cat2, biology_main, biology, biology_pl, biology_points,
+          social_studies_cat1, social_studies_cat2, social_studies_main, social_studies, social_studies_pl, social_studies_points,
           cre_cat1, cre_cat2, cre_main, cre, cre_pl, cre_points,
           pre_technical_cat1, pre_technical_cat2, pre_technical_main, pre_technical, pre_technical_pl, pre_technical_points,
           creative_arts_cat1, creative_arts_cat2, creative_arts_main, creative_arts, creative_arts_pl, creative_arts_points,
@@ -273,12 +275,12 @@ export default function registerExamRoutes(app) {
           agriculture = EXCLUDED.agriculture,
           agriculture_pl = EXCLUDED.agriculture_pl,
           agriculture_points = EXCLUDED.agriculture_points,
-          biology_cat1 = EXCLUDED.biology_cat1,
-          biology_cat2 = EXCLUDED.biology_cat2,
-          biology_main = EXCLUDED.biology_main,
-          biology = EXCLUDED.biology,
-          biology_pl = EXCLUDED.biology_pl,
-          biology_points = EXCLUDED.biology_points,
+          social_studies_cat1 = EXCLUDED.social_studies_cat1,
+          social_studies_cat2 = EXCLUDED.social_studies_cat2,
+          social_studies_main = EXCLUDED.social_studies_main,
+          social_studies = EXCLUDED.social_studies,
+          social_studies_pl = EXCLUDED.social_studies_pl,
+          social_studies_points = EXCLUDED.social_studies_points,
           cre_cat1 = EXCLUDED.cre_cat1,
           cre_cat2 = EXCLUDED.cre_cat2,
           cre_main = EXCLUDED.cre_main,
@@ -308,7 +310,7 @@ export default function registerExamRoutes(app) {
           g.mathematics_cat1, g.mathematics_cat2, g.mathematics_main, g.mathematics, g.mathematics_pl, g.mathematics_points,
           g.integrated_science_cat1, g.integrated_science_cat2, g.integrated_science_main, g.integrated_science, g.integrated_science_pl, g.integrated_science_points,
           g.agriculture_cat1, g.agriculture_cat2, g.agriculture_main, g.agriculture, g.agriculture_pl, g.agriculture_points,
-          g.biology_cat1, g.biology_cat2, g.biology_main, g.biology, g.biology_pl, g.biology_points,
+          g.social_studies_cat1, g.social_studies_cat2, g.social_studies_main, g.social_studies, g.social_studies_pl, g.social_studies_points,
           g.cre_cat1, g.cre_cat2, g.cre_main, g.cre, g.cre_pl, g.cre_points,
           g.pre_technical_cat1, g.pre_technical_cat2, g.pre_technical_main, g.pre_technical, g.pre_technical_pl, g.pre_technical_points,
           g.creative_arts_cat1, g.creative_arts_cat2, g.creative_arts_main, g.creative_arts, g.creative_arts_pl, g.creative_arts_points,
@@ -354,7 +356,7 @@ export default function registerExamRoutes(app) {
       mathematics_cat1, mathematics_cat2, mathematics_main,
       integrated_science_cat1, integrated_science_cat2, integrated_science_main,
       agriculture_cat1, agriculture_cat2, agriculture_main,
-      biology_cat1, biology_cat2, biology_main,
+      social_studies_cat1, social_studies_cat2, social_studies_main,
       cre_cat1, cre_cat2, cre_main,
       pre_technical_cat1, pre_technical_cat2, pre_technical_main,
       creative_arts_cat1, creative_arts_cat2, creative_arts_main
@@ -379,7 +381,7 @@ export default function registerExamRoutes(app) {
     const mathematics = convertExamMark(parseRawMark(mathematics_cat1), parseRawMark(mathematics_cat2), parseRawMark(mathematics_main));
     const integrated_science = convertExamMark(parseRawMark(integrated_science_cat1), parseRawMark(integrated_science_cat2), parseRawMark(integrated_science_main));
     const agriculture = convertExamMark(parseRawMark(agriculture_cat1), parseRawMark(agriculture_cat2), parseRawMark(agriculture_main));
-    const biology = convertExamMark(parseRawMark(biology_cat1), parseRawMark(biology_cat2), parseRawMark(biology_main));
+    const social_studies = convertExamMark(parseRawMark(social_studies_cat1), parseRawMark(social_studies_cat2), parseRawMark(social_studies_main));
     const cre = convertExamMark(parseRawMark(cre_cat1), parseRawMark(cre_cat2), parseRawMark(cre_main));
     const pre_technical = convertExamMark(parseRawMark(pre_technical_cat1), parseRawMark(pre_technical_cat2), parseRawMark(pre_technical_main));
     const creative_arts = convertExamMark(parseRawMark(creative_arts_cat1), parseRawMark(creative_arts_cat2), parseRawMark(creative_arts_main));
@@ -389,12 +391,12 @@ export default function registerExamRoutes(app) {
     const { pl: mathematics_pl, points: mathematics_points } = getGradeAndPoints(mathematics);
     const { pl: integrated_science_pl, points: integrated_science_points } = getGradeAndPoints(integrated_science);
     const { pl: agriculture_pl, points: agriculture_points } = getGradeAndPoints(agriculture);
-    const { pl: biology_pl, points: biology_points } = getGradeAndPoints(biology);
+    const { pl: social_studies_pl, points: social_studies_points } = getGradeAndPoints(social_studies);
     const { pl: cre_pl, points: cre_points } = getGradeAndPoints(cre);
     const { pl: pre_technical_pl, points: pre_technical_points } = getGradeAndPoints(pre_technical);
     const { pl: creative_arts_pl, points: creative_arts_points } = getGradeAndPoints(creative_arts);
 
-    const scores = [english, kiswahili, mathematics, integrated_science, agriculture, biology, cre, pre_technical, creative_arts];
+    const scores = [english, kiswahili, mathematics, integrated_science, agriculture, social_studies, cre, pre_technical, creative_arts];
     const validMarks = scores.filter(Number.isFinite);
     const evrg = validMarks.length === 9
       ? Math.round(validMarks.reduce((sum, n) => sum + n, 0) / 9)
@@ -409,7 +411,7 @@ export default function registerExamRoutes(app) {
           mathematics_cat1=$13, mathematics_cat2=$14, mathematics_main=$15, mathematics=$16, mathematics_pl=$17, mathematics_points=$18,
           integrated_science_cat1=$19, integrated_science_cat2=$20, integrated_science_main=$21, integrated_science=$22, integrated_science_pl=$23, integrated_science_points=$24,
           agriculture_cat1=$25, agriculture_cat2=$26, agriculture_main=$27, agriculture=$28, agriculture_pl=$29, agriculture_points=$30,
-          biology_cat1=$31, biology_cat2=$32, biology_main=$33, biology=$34, biology_pl=$35, biology_points=$36,
+          social_studies_cat1=$31, social_studies_cat2=$32, social_studies_main=$33, social_studies=$34, social_studies_pl=$35, social_studies_points=$36,
           cre_cat1=$37, cre_cat2=$38, cre_main=$39, cre=$40, cre_pl=$41, cre_points=$42,
           pre_technical_cat1=$43, pre_technical_cat2=$44, pre_technical_main=$45, pre_technical=$46, pre_technical_pl=$47, pre_technical_points=$48,
           creative_arts_cat1=$49, creative_arts_cat2=$50, creative_arts_main=$51, creative_arts=$52, creative_arts_pl=$53, creative_arts_points=$54,
@@ -421,7 +423,7 @@ export default function registerExamRoutes(app) {
           mathematics_cat1, mathematics_cat2, mathematics_main, mathematics, mathematics_pl, mathematics_points,
           integrated_science_cat1, integrated_science_cat2, integrated_science_main, integrated_science, integrated_science_pl, integrated_science_points,
           agriculture_cat1, agriculture_cat2, agriculture_main, agriculture, agriculture_pl, agriculture_points,
-          biology_cat1, biology_cat2, biology_main, biology, biology_pl, biology_points,
+          social_studies_cat1, social_studies_cat2, social_studies_main, social_studies, social_studies_pl, social_studies_points,
           cre_cat1, cre_cat2, cre_main, cre, cre_pl, cre_points,
           pre_technical_cat1, pre_technical_cat2, pre_technical_main, pre_technical, pre_technical_pl, pre_technical_points,
           creative_arts_cat1, creative_arts_cat2, creative_arts_main, creative_arts, creative_arts_pl, creative_arts_points,
@@ -456,8 +458,13 @@ export default function registerExamRoutes(app) {
   app.get('/exams/export', isAuthenticated, isTeacher, async (req, res) => {
     const { grade, term } = req.query;
     const selectedTerm = ["1", "2", "3"].includes(term) ? term : "1";
+
+    if (!grade) {
+      return res.render('error.ejs', { message: 'Grade is required for export' });
+    }
+
     const result = await db.query(
-      `SELECT lr.*, l.name, l.assessment_number, l.birth_certificate, l.class_teacher
+      `SELECT lr.*, l.name, l.assessment_number, l.grade AS learner_grade
        FROM learner_results lr
        JOIN learners l ON lr.learner_id = l.id
        WHERE l.grade = $1 AND lr.term = $2
@@ -465,26 +472,10 @@ export default function registerExamRoutes(app) {
       [grade, selectedTerm]
     );
 
-    const escapeCsv = value => {
-      if (value === null || value === undefined) return '';
-      const str = String(value);
-      return `"${str.replace(/"/g, '""')}"`;
-    };
 
-    const allFieldNames = result.fields.map(field => field.name);
+    const subjKeys = examSubjectKeys; // ordered subject keys
 
-    // Reorder columns: priority metadata first, then summary and remaining fields
-    const priorityFields = [
-      'id', 'name', 'assessment_number', 'birth_certificate', 'grade',
-      'pos', 'evrg', 'evrg_pl', 'evrg_points', 'responsibility', 'class_teacher'
-    ];
-    const subjectFields = allFieldNames.filter(f => !priorityFields.includes(f));
-    const fieldNames = [...new Set([...priorityFields, ...subjectFields])].filter(
-      f => allFieldNames.includes(f) || ['pos', 'avrg', 'evrg', 'evrg_pl', 'evrg_points'].includes(f)
-    );
-
-    const subjKeys = ['english', 'kiswahili', 'mathematics', 'integrated_science', 'agriculture', 'biology', 'cre', 'pre_technical', 'creative_arts'];
-
+    // compute averages and final evrg values
     const learners = result.rows.map(row => {
       let sum = 0;
       let count = 0;
@@ -497,26 +488,60 @@ export default function registerExamRoutes(app) {
       }
       const avrg = count === subjKeys.length ? Math.round(sum / subjKeys.length) : null;
       const evrg = row.evrg ?? avrg;
-      const { pl: evrg_pl, points: evrg_points } = evrg !== null && evrg !== undefined
-        ? getGradeAndPoints(Number(evrg))
-        : { pl: '', points: '' };
-      return { ...row, avrg, evrg, evrg_pl, evrg_points };
+      return { ...row, avrg, evrg };
     });
 
+    // sort by evrg desc then name
     learners.sort((a, b) => {
       if ((b.evrg || 0) !== (a.evrg || 0)) return (b.evrg || 0) - (a.evrg || 0);
       return String(a.name || '').localeCompare(String(b.name || ''));
     });
 
-    learners.forEach((row, idx) => {
-      row.pos = idx + 1;
-    });
+    learners.forEach((r, i) => { r.pos = i + 1; });
 
-    let csv = fieldNames.map(escapeCsv).join(',') + '\n';
+    // Build CSV headers using short column names to save space
+    const shortMap = {
+      english: 'eng',
+      kiswahili: 'kis',
+      mathematics: 'math',
+      integrated_science: 'int',
+      agriculture: 'agr',
+      social_studies: 'ss',
+      cre: 'cre',
+      pre_technical: 'pt',
+      creative_arts: 'ca'
+    };
+
+    const headers = [
+      'name',
+      'assNo',
+      'grade',
+      ...examSubjectKeys.flatMap(k => [shortMap[k] || k, 'pl']),
+      'evrg',
+      'pos'
+    ];
+
+    const escapeCsv = value => {
+      if (value === null || value === undefined) return '';
+      const str = String(value);
+      return `"${str.replace(/"/g, '""')}"`;
+    };
+
+    let csv = headers.map(escapeCsv).join(',') + '\n';
 
     learners.forEach(row => {
-      const rowData = fieldNames.map(name => escapeCsv(row[name] ?? '')).join(',');
-      csv += rowData + '\n';
+      const cols = [];
+      cols.push(row.name ?? '');
+      cols.push(row.assessment_number ?? '');
+      cols.push(row.learner_grade ?? grade);
+      for (const key of subjKeys) {
+        cols.push(row[key] ?? '');
+        cols.push(row[`${key}_pl`] ?? '');
+      }
+      cols.push(row.evrg ?? '');
+      cols.push(row.pos ?? '');
+
+      csv += cols.map(escapeCsv).join(',') + '\n';
     });
 
     res.setHeader('Content-Type', 'text/csv');
@@ -798,7 +823,7 @@ export default function registerExamRoutes(app) {
       { key: 'mathematics', label: 'Mathematics' },
       { key: 'integrated_science', label: 'Integrated Science' },
       { key: 'agriculture', label: 'Agriculture' },
-      { key: 'biology', label: 'Biology' },
+      { key: 'social_studies', label: 'Social Studies' },
       { key: 'cre', label: 'CRE' },
       { key: 'pre_technical', label: 'Pre-Technical' },
       { key: 'creative_arts', label: 'Creative Arts' },
@@ -1140,3 +1165,6 @@ export default function registerExamRoutes(app) {
     }
   });
 }
+
+
+
