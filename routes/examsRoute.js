@@ -31,6 +31,44 @@ const examSubjectDefinitions = [
 ];
 const examSubjectKeys = examSubjectDefinitions.map(subject => subject.key);
 
+const normalizeSubjectKey = label => (label || '')
+  .toString()
+  .trim()
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, '_')
+  .replace(/^_+|_+$/g, '');
+
+const parseSubjectDefinitions = rawValue => {
+  if (!rawValue) return examSubjectDefinitions;
+  try {
+    const parsed = JSON.parse(rawValue);
+    if (!Array.isArray(parsed)) return examSubjectDefinitions;
+    const normalized = parsed
+      .map(subject => {
+        if (typeof subject === 'string') {
+          const label = subject.trim();
+          return label ? { key: normalizeSubjectKey(label), label } : null;
+        }
+        if (subject && typeof subject === 'object' && subject.label) {
+          const label = subject.label.trim();
+          return label ? { key: normalizeSubjectKey(subject.key || label), label } : null;
+        }
+        return null;
+      })
+      .filter(Boolean);
+    return normalized.length ? normalized : examSubjectDefinitions;
+  } catch (err) {
+    return examSubjectDefinitions;
+  }
+};
+
+const getSubjectDefinitionsForGrade = gradeValue => {
+  if (gradeValue && Number.isInteger(Number(gradeValue))) {
+    return examSubjectDefinitions;
+  }
+  return examSubjectDefinitions;
+};
+
 export default function registerExamRoutes(app) {
   app.get('/exams', isAuthenticated, isTeacher, async (req, res) => {
     const { grade, term } = req.query;
@@ -146,14 +184,18 @@ export default function registerExamRoutes(app) {
         [selectedTerm]
       );
     }
-    res.render('addExam.ejs', { grade: grade || null, selectedTerm, learners: result.rows, selectedLearnerId });
+    const subjectDefinitions = getSubjectDefinitionsForGrade(grade);
+    res.render('addExam.ejs', { grade: grade || null, selectedTerm, learners: result.rows, selectedLearnerId, subjectDefinitions });
   });
 
   app.post('/exams/add', isAuthenticated, isTeacher, async (req, res) => {
     const { learner_id, term, grade } = req.body;
     const selectedTerm = ["1", "2", "3"].includes(term) ? term : "1";
     const selectedGrade = grade || null;
-    const subjectKeys = examSubjectKeys;
+    const requestedSubjectDefinitions = parseSubjectDefinitions(req.body.subjects_config);
+    const subjectKeys = requestedSubjectDefinitions
+      .map(subject => subject.key)
+      .filter(key => examSubjectKeys.includes(key));
 
     const parseRawMark = value => {
       if (value === '' || value === null || value === undefined) return null;
@@ -166,7 +208,7 @@ export default function registerExamRoutes(app) {
       const scoreCat1 = cat1 || 0;
       const scoreCat2 = cat2 || 0;
       const scoreMain = main || 0;
-      return Math.round((scoreCat1 / 100) * 15 + (scoreCat2 / 100) * 15 + (scoreMain / 100) * 70);
+      return Math.round((scoreCat1 / 100 * 15) + (scoreCat2 / 100 * 15) + (scoreMain / 100 * 70));
     };
 
     let existingTermResult = {};
@@ -373,7 +415,7 @@ export default function registerExamRoutes(app) {
       const scoreCat1 = cat1 || 0;
       const scoreCat2 = cat2 || 0;
       const scoreMain = main || 0;
-      return Math.round((scoreCat1 / 100) * 15 + (scoreCat2 / 100) * 15 + (scoreMain / 100) * 70);
+      return Math.round((scoreCat1 / 100 * 15) + (scoreCat2 / 100 * 15) + (scoreMain / 100 * 70));
     };
 
     const english = convertExamMark(parseRawMark(english_cat1), parseRawMark(english_cat2), parseRawMark(english_main));

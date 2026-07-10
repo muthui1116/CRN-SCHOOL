@@ -14,8 +14,18 @@
       <form action="/exams/add" method="POST">
         <input type="hidden" name="grade" value="<%= grade %>">
         <input type="hidden" name="term" value="<%= selectedTerm %>">
+        <input type="hidden" name="subjects_config" id="subjectsConfigInput" value='[]'>
 
         <div class="row gx-3 mb-4">
+          <div class="col-12 col-lg-6">
+            <label class="form-label fw-semibold">Grade</label>
+            <select id="gradeSelect" class="form-select form-select-sm" required>
+              <% for (let i = 1; i <= 9; i++) { %>
+                <option value="<%= i %>" <%= String(grade || 1) === String(i) ? 'selected' : '' %>>Grade <%= i %></option>
+              <% } %>
+            </select>
+            <div class="form-text">Choose the grade and manage the subjects for this result sheet.</div>
+          </div>
           <div class="col-12 col-lg-6">
             <label class="form-label fw-semibold">Learner</label>
             <select name="learner_id" class="form-select form-select-sm" required>
@@ -32,6 +42,22 @@
           </div>
         </div>
 
+        <div class="card border-light bg-light-subtle mb-4">
+          <div class="card-body">
+            <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start gap-3 mb-3">
+              <div>
+                <h6 class="mb-1">Subjects for this grade</h6>
+                <p class="text-muted mb-0">Add or remove subjects that should appear on this result sheet.</p>
+              </div>
+              <div class="d-flex gap-2 align-items-center w-100 w-lg-auto">
+                <input type="text" id="newSubjectInput" class="form-control form-control-sm" placeholder="New subject name">
+                <button type="button" id="addSubjectBtn" class="btn btn-outline-primary btn-sm">Add subject</button>
+              </div>
+            </div>
+            <div id="subjectChips" class="d-flex flex-wrap gap-2"></div>
+          </div>
+        </div>
+
         <div class="table-responsive shadow-sm rounded overflow-hidden">
           <table class="table table-bordered mb-0 align-middle">
             <thead class="table-secondary">
@@ -43,36 +69,14 @@
                 <th class="text-center fw-semibold">Final</th>
               </tr>
             </thead>
-            <tbody>
-              <% const subjects = [
-                { key: 'english', label: 'English' },
-                { key: 'kiswahili', label: 'Kiswahili' },
-                { key: 'mathematics', label: 'Mathematics' },
-                { key: 'integrated_science', label: 'Integrated Science' },
-                { key: 'agriculture', label: 'Agriculture' },
-                { key: 'social_studies', label: 'Social Studies' },
-                { key: 'cre', label: 'CRE' },
-                { key: 'pre_technical', label: 'Pre-Technical' },
-                { key: 'creative_arts', label: 'Creative Arts' }
-              ]; %>
-
-              <% subjects.forEach(subject => { %>
-                <tr>
-                  <td><%= subject.label %></td>
-                  <td class="text-center"><input type="number" name="<%= subject.key %>_cat1" class="form-control form-control-sm occasion-input text-center" min="0" max="100"></td>
-                  <td class="text-center"><input type="number" name="<%= subject.key %>_cat2" class="form-control form-control-sm occasion-input text-center" min="0" max="100"></td>
-                  <td class="text-center"><input type="number" name="<%= subject.key %>_main" class="form-control form-control-sm occasion-input text-center" min="0" max="100"></td>
-                  <td class="text-center"><input type="text" class="form-control form-control-sm final-mark text-center" data-subject="<%= subject.key %>" readonly></td>
-                </tr>
-              <% }) %>
-            </tbody>
+            <tbody id="subjectRowsBody"></tbody>
           </table>
         </div>
 
         <div class="row align-items-center mt-4">
           <div class="col-12 col-md-8">
             <div class="alert alert-info mb-0">
-              <strong>Score formula:</strong> CAT1 × 15% + CAT2 × 15% + Main Exam × 70%. Final marks appear live as you type.
+              <strong>Score formula:</strong> CAT1/100×15 + CAT2/100×15 + Main Exam/100×70. Final marks appear live as you type.
             </div>
           </div>
           <div class="col-12 col-md-4 text-md-end mt-3 mt-md-0">
@@ -82,11 +86,83 @@
       </form>
 
       <script>
-        const subjectKeys = ['english','kiswahili','mathematics','integrated_science','agriculture','social_studies','cre','pre_technical','creative_arts'];
-        const learnersData = "<%- JSON.stringify(typeof learners !== 'undefined' ? learners : []) %>";
-        const gradeValue = "<%= grade %>";
+        const learnersData = <%- JSON.stringify(typeof learners !== 'undefined' ? learners : [])%>;
+        const defaultSubjectDefinitions = <%- JSON.stringify(subjectDefinitions || []) %>;
+        const gradeValue = "<%= grade || '' %>";
         const selectedTermValue = "<%= selectedTerm %>";
         const learnerSelect = document.querySelector('[name="learner_id"]');
+        const gradeSelect = document.getElementById('gradeSelect');
+        const gradeInput = document.querySelector('input[name="grade"]');
+        const subjectsConfigInput = document.getElementById('subjectsConfigInput');
+        const subjectChips = document.getElementById('subjectChips');
+        const subjectRowsBody = document.getElementById('subjectRowsBody');
+        const newSubjectInput = document.getElementById('newSubjectInput');
+        const addSubjectBtn = document.getElementById('addSubjectBtn');
+
+        let subjectDefinitions = [];
+
+        const buildFallbackSubjects = () => [
+          { key: 'english', label: 'English' },
+          { key: 'kiswahili', label: 'Kiswahili' },
+          { key: 'mathematics', label: 'Mathematics' },
+          { key: 'integrated_science', label: 'Integrated Science' },
+          { key: 'agriculture', label: 'Agriculture' },
+          { key: 'social_studies', label: 'Social Studies' },
+          { key: 'cre', label: 'CRE' },
+          { key: 'pre_technical', label: 'Pre-Technical' },
+          { key: 'creative_arts', label: 'Creative Arts' }
+        ];
+
+        const normalizeSubjectKey = label => (label || '')
+          .toString()
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '_')
+          .replace(/^_+|_+$/g, '');
+
+        const escapeHtml = value => String(value)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/\"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+
+        const getSubjectStorageKey = selectedGrade => `exam_add_subjects_${selectedGrade || 'default'}`;
+
+        const getStoredSubjectDefinitions = selectedGrade => {
+          try {
+            const raw = localStorage.getItem(getSubjectStorageKey(selectedGrade));
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            if (!Array.isArray(parsed)) return null;
+            const normalized = parsed
+              .map(subject => {
+                if (typeof subject === 'string') {
+                  const label = subject.trim();
+                  return label ? { key: normalizeSubjectKey(label), label } : null;
+                }
+                if (subject && typeof subject === 'object' && subject.label) {
+                  const label = subject.label.trim();
+                  return label ? { key: normalizeSubjectKey(subject.key || label), label } : null;
+                }
+                return null;
+              })
+              .filter(Boolean);
+            return normalized.length ? normalized : null;
+          } catch (err) {
+            return null;
+          }
+        };
+
+        const subjectKeys = () => subjectDefinitions.map(subject => subject.key);
+
+        const saveSubjectDefinitions = () => {
+          const activeGrade = gradeSelect?.value || gradeValue || '1';
+          localStorage.setItem(getSubjectStorageKey(activeGrade), JSON.stringify(subjectDefinitions));
+          if (subjectsConfigInput) {
+            subjectsConfigInput.value = JSON.stringify(subjectDefinitions);
+          }
+        };
 
         const parseScore = value => {
           if (value === '' || value === null || value === undefined) return null;
@@ -99,7 +175,7 @@
           const scoreCat1 = cat1 || 0;
           const scoreCat2 = cat2 || 0;
           const scoreMain = main || 0;
-          return Math.round((scoreCat1 / 100) * 15 + (scoreCat2 / 100) * 15 + (scoreMain / 100) * 70);
+          return Math.round((scoreCat1 / 100 * 15) + (scoreCat2 / 100 * 15) + (scoreMain / 100 * 70));
         };
 
         const getStateKey = () => {
@@ -109,7 +185,7 @@
 
         const saveFormState = () => {
           const state = { learner_id: learnerSelect ? learnerSelect.value : null, values: {} };
-          subjectKeys.forEach(subject => {
+          subjectKeys().forEach(subject => {
             state.values[`${subject}_cat1`] = document.querySelector(`input[name="${subject}_cat1"]`)?.value || '';
             state.values[`${subject}_cat2`] = document.querySelector(`input[name="${subject}_cat2"]`)?.value || '';
             state.values[`${subject}_main`] = document.querySelector(`input[name="${subject}_main"]`)?.value || '';
@@ -122,10 +198,10 @@
           if (!saved) return false;
           try {
             const state = JSON.parse(saved);
-            if (learnerSelect && state.learner_id) {
+            if (learnerSelect && state.learner_id && learnerSelect.querySelector(`option[value="${state.learner_id}"]`)) {
               learnerSelect.value = state.learner_id;
             }
-            subjectKeys.forEach(subject => {
+            subjectKeys().forEach(subject => {
               const cat1 = document.querySelector(`input[name="${subject}_cat1"]`);
               const cat2 = document.querySelector(`input[name="${subject}_cat2"]`);
               const main = document.querySelector(`input[name="${subject}_main"]`);
@@ -142,12 +218,8 @@
           }
         };
 
-        const clearFormState = () => {
-          localStorage.removeItem(getStateKey());
-        };
-
         const updateFinal = () => {
-          subjectKeys.forEach(subject => {
+          subjectKeys().forEach(subject => {
             const cat1 = document.querySelector(`input[name="${subject}_cat1"]`);
             const cat2 = document.querySelector(`input[name="${subject}_cat2"]`);
             const main = document.querySelector(`input[name="${subject}_main"]`);
@@ -158,9 +230,59 @@
           });
         };
 
+        const renderSubjects = () => {
+          if (subjectChips) {
+            subjectChips.innerHTML = '';
+          }
+          if (subjectRowsBody) {
+            subjectRowsBody.innerHTML = '';
+          }
+
+          if (!subjectDefinitions.length) {
+            subjectDefinitions = (defaultSubjectDefinitions && defaultSubjectDefinitions.length ? defaultSubjectDefinitions : buildFallbackSubjects()).map(subject => ({ ...subject }));
+          }
+
+          subjectDefinitions.forEach(subject => {
+            if (subjectChips) {
+              const chip = document.createElement('span');
+              chip.className = 'badge rounded-pill bg-primary-subtle text-primary border d-inline-flex align-items-center gap-2';
+              chip.innerHTML = `${escapeHtml(subject.label)} <button type="button" class="btn-close btn-close-sm" data-remove-subject="${escapeHtml(subject.key)}" aria-label="Remove ${escapeHtml(subject.label)}"></button>`;
+              subjectChips.appendChild(chip);
+            }
+
+            if (subjectRowsBody) {
+              const row = document.createElement('tr');
+              row.innerHTML = `
+                <td class="fw-semibold">${escapeHtml(subject.label)}</td>
+                <td class="text-center"><input type="number" name="${subject.key}_cat1" class="form-control form-control-sm occasion-input text-center" min="0" max="100"></td>
+                <td class="text-center"><input type="number" name="${subject.key}_cat2" class="form-control form-control-sm occasion-input text-center" min="0" max="100"></td>
+                <td class="text-center"><input type="number" name="${subject.key}_main" class="form-control form-control-sm occasion-input text-center" min="0" max="100"></td>
+                <td class="text-center"><input type="text" class="form-control form-control-sm final-mark text-center" data-subject="${subject.key}" readonly></td>
+              `;
+              subjectRowsBody.appendChild(row);
+            }
+          });
+
+          saveSubjectDefinitions();
+          updateFinal();
+        };
+
+        const addSubject = () => {
+          const newLabel = (newSubjectInput?.value || '').trim();
+          if (!newLabel) return;
+          const key = normalizeSubjectKey(newLabel);
+          if (!key || subjectDefinitions.some(subject => subject.key === key)) {
+            if (newSubjectInput) newSubjectInput.value = '';
+            return;
+          }
+          subjectDefinitions.push({ key, label: newLabel });
+          if (newSubjectInput) newSubjectInput.value = '';
+          renderSubjects();
+        };
+
         const populateLearnerScores = learnerId => {
           const learner = learnersData.find(l => String(l.id) === String(learnerId) || String(l.learner_id) === String(learnerId));
-          subjectKeys.forEach(subject => {
+          subjectKeys().forEach(subject => {
             const cat1 = document.querySelector(`input[name="${subject}_cat1"]`);
             const cat2 = document.querySelector(`input[name="${subject}_cat2"]`);
             const main = document.querySelector(`input[name="${subject}_main"]`);
@@ -179,17 +301,55 @@
           saveFormState();
         };
 
+        const switchGrade = () => {
+          const selectedGrade = gradeSelect?.value || gradeValue || '1';
+          if (gradeInput) {
+            gradeInput.value = selectedGrade;
+          }
+          const storedSubjects = getStoredSubjectDefinitions(selectedGrade);
+          subjectDefinitions = storedSubjects || (defaultSubjectDefinitions && defaultSubjectDefinitions.length ? defaultSubjectDefinitions : buildFallbackSubjects()).map(subject => ({ ...subject }));
+          renderSubjects();
+        };
+
+        const changeGrade = () => {
+          const selectedGrade = gradeSelect?.value || gradeValue || '1';
+          const params = new URLSearchParams(window.location.search);
+          params.set('grade', selectedGrade);
+          params.set('term', selectedTermValue);
+          window.location.href = `${window.location.pathname}?${params.toString()}`;
+        };
+
         if (learnerSelect) {
           learnerSelect.addEventListener('change', event => {
             populateLearnerScores(event.target.value);
           });
         }
 
-        document.querySelectorAll('.occasion-input').forEach(input => {
-          input.addEventListener('input', () => {
-            updateFinal();
-            saveFormState();
-          });
+        gradeSelect?.addEventListener('change', () => {
+          switchGrade();
+          changeGrade();
+        });
+        addSubjectBtn?.addEventListener('click', addSubject);
+        newSubjectInput?.addEventListener('keydown', event => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            addSubject();
+          }
+        });
+
+        subjectChips?.addEventListener('click', event => {
+          const button = event.target.closest('button[data-remove-subject]');
+          if (!button) return;
+          const subjectKey = button.getAttribute('data-remove-subject');
+          if (!subjectKey) return;
+          subjectDefinitions = subjectDefinitions.filter(subject => subject.key !== subjectKey);
+          renderSubjects();
+        });
+
+        document.addEventListener('input', event => {
+          if (!event.target.matches('.occasion-input')) return;
+          updateFinal();
+          saveFormState();
         });
 
         const tryRestore = () => {
@@ -202,9 +362,13 @@
           loadFormState();
         };
 
-        if (learnerSelect && learnerSelect.value) {
+        switchGrade();
+
+        const restored = loadFormState();
+        if (restored && learnerSelect && learnerSelect.value) {
           populateLearnerScores(learnerSelect.value);
-          loadFormState();
+        } else if (learnerSelect && learnerSelect.value) {
+          populateLearnerScores(learnerSelect.value);
         } else if (window.location.search.includes('learner_id=')) {
           tryRestore();
         }
@@ -216,9 +380,12 @@
             if (!learnerId) {
               return;
             }
-            // preserve the form state until redirect back to the add page
+            if (gradeSelect) {
+              gradeInput.value = gradeSelect.value;
+            }
+            saveSubjectDefinitions();
             const state = { learner_id: learnerId, values: {} };
-            subjectKeys.forEach(subject => {
+            subjectKeys().forEach(subject => {
               state.values[`${subject}_cat1`] = document.querySelector(`input[name="${subject}_cat1"]`)?.value || '';
               state.values[`${subject}_cat2`] = document.querySelector(`input[name="${subject}_cat2"]`)?.value || '';
               state.values[`${subject}_main`] = document.querySelector(`input[name="${subject}_main"]`)?.value || '';
