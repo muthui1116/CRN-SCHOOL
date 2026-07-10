@@ -31,37 +31,6 @@ const examSubjectDefinitions = [
 ];
 const examSubjectKeys = examSubjectDefinitions.map(subject => subject.key);
 
-const normalizeSubjectKey = label => (label || '')
-  .toString()
-  .trim()
-  .toLowerCase()
-  .replace(/[^a-z0-9]+/g, '_')
-  .replace(/^_+|_+$/g, '');
-
-const parseSubjectDefinitions = rawValue => {
-  if (!rawValue) return examSubjectDefinitions;
-  try {
-    const parsed = JSON.parse(rawValue);
-    if (!Array.isArray(parsed)) return examSubjectDefinitions;
-    const normalized = parsed
-      .map(subject => {
-        if (typeof subject === 'string') {
-          const label = subject.trim();
-          return label ? { key: normalizeSubjectKey(label), label } : null;
-        }
-        if (subject && typeof subject === 'object' && subject.label) {
-          const label = subject.label.trim();
-          return label ? { key: normalizeSubjectKey(subject.key || label), label } : null;
-        }
-        return null;
-      })
-      .filter(Boolean);
-    return normalized.length ? normalized : examSubjectDefinitions;
-  } catch (err) {
-    return examSubjectDefinitions;
-  }
-};
-
 const getSubjectDefinitionsForGrade = gradeValue => {
   if (gradeValue && Number.isInteger(Number(gradeValue))) {
     return examSubjectDefinitions;
@@ -192,10 +161,7 @@ export default function registerExamRoutes(app) {
     const { learner_id, term, grade } = req.body;
     const selectedTerm = ["1", "2", "3"].includes(term) ? term : "1";
     const selectedGrade = grade || null;
-    const requestedSubjectDefinitions = parseSubjectDefinitions(req.body.subjects_config);
-    const subjectKeys = requestedSubjectDefinitions
-      .map(subject => subject.key)
-      .filter(key => examSubjectKeys.includes(key));
+    const subjectKeys = examSubjectKeys;
 
     const parseRawMark = value => {
       if (value === '' || value === null || value === undefined) return null;
@@ -711,6 +677,9 @@ export default function registerExamRoutes(app) {
 </head>
 <body>
   <div class="page">
+    <div style="margin-bottom: 16px;">
+      <button onclick="window.history.back()" style="padding: 8px 16px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem;">← Go Back</button>
+    </div>
     <div class="header">
       <div class="title">Best In & Most Improved Report</div>
       <div class="subtitle">Grade ${grade} — Generated ${currentDate}</div>
@@ -983,16 +952,31 @@ export default function registerExamRoutes(app) {
       font-size: 0.85rem;
       color: #999;
     }
+    .back-button {
+      display: inline-block;
+      padding: 8px 16px;
+      background: #6c757d;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+    }
+    .back-button:hover {
+      background: #5a6268;
+    }
     @media print {
       body { background: white; }
       .page-break { page-break-after: always; }
       .report-form { box-shadow: none; margin-bottom: 0; }
+      .back-button { display: none; }
     }
   </style>
 </head>
 <body>
+  <button class="back-button" onclick="window.history.back();">← Go Back</button>
 `;
-
     result.rows.forEach((learner, idx) => {
       html += `
   <div class="page-break">
