@@ -393,7 +393,8 @@ export default function registerRoutes(app) {
           ],
         );
 
-        res.redirect("/");
+        // After updating a user, redirect back to the edited user's page to show updated details
+        return res.redirect(`/edit-user/${req.params.id}/edit`);
       } catch (err) {
         console.error(err);
         res.status(500).send("Server error: " + err.message);
@@ -539,7 +540,7 @@ export default function registerRoutes(app) {
           ],
         );
 
-        res.redirect("/");
+        return res.redirect(getRoleLanding(assignedRole));
       } catch (err) {
         console.error(err);
         res.status(500).send("Server error: " + err.message);

@@ -85,54 +85,6 @@ export default function registerAdminRoutes(app) {
     }
   });
 
-  app.get("/grades/:id/edit", isAuthenticated, isManager, async (req, res) => {
-    try {
-      const { rows } = await db.query("SELECT * FROM grade WHERE id = $1", [
-        req.params.id,
-      ]);
-      if (!rows[0]) return res.status(404).send("Grade not found");
-      const teacherResult = await fetchTeachersList();
-      res.render("editGrade.ejs", { grade: rows[0], teachers: teacherResult });
-    } catch (err) {
-      console.error("Get grade error:", err.message);
-      res.status(500).send("Server error");
-    }
-  });
-
-  app.post("/grades/:id/edit", isAuthenticated, isManager, async (req, res) => {
-    try {
-      const { name, enrolment, class_teacher } = req.body;
-      await db.query(
-        "UPDATE grade SET name = $1, enrolment = $2, class_teacher = $3 WHERE id = $4",
-        [
-          name || null,
-          enrolment ? parseInt(enrolment, 10) : null,
-          class_teacher || null,
-          req.params.id,
-        ],
-      );
-      res.redirect("/grades");
-    } catch (err) {
-      console.error("Update grade error:", err.message);
-      res.status(500).send("Server error");
-    }
-  });
-
-  app.post(
-    "/grades/delete/:id",
-    isAuthenticated,
-    isManager,
-    async (req, res) => {
-      try {
-        await db.query("DELETE FROM grade WHERE id = $1", [req.params.id]);
-        res.redirect("/grades");
-      } catch (err) {
-        console.error("Delete grade error:", err.message);
-        res.status(500).send("Server error");
-      }
-    },
-  );
-
   app.get("/teachers", isAuthenticated, isManager, async (req, res) => {
     try {
       let rows;
@@ -442,70 +394,78 @@ export default function registerAdminRoutes(app) {
     isManager,
     async (req, res) => {
       try {
-        const scoreValidation = validateSubjectScores(req.body);
-        if (!scoreValidation.valid)
-          return res.status(400).send(scoreValidation.message);
+        console.log('Update learner request:', { id: req.params.id, body: req.body });
 
-        const fields = [];
-        const values = [];
-        let idx = 1;
-        for (const [k, v] of Object.entries(req.body)) {
-          if (
-            [
-              "name",
-              "assessment_number",
-              "adn_no",
-              "birth_certificate",
-              "grade",
-              "class_teacher",
-              "responsibility",
-              "english",
-              "english_pl",
-              "english_points",
-              "cre",
-              "cre_pl",
-              "cre_points",
-              "pre_technical",
-              "pre_technical_pl",
-              "pre_technical_points",
-              "integrated_science",
-              "integrated_science_pl",
-              "integrated_science_points",
-              "agriculture",
-              "agriculture_pl",
-              "agriculture_points",
-              "social_studies",
-              "social_studies_pl",
-              "social_studies_points",
-              "mathematics",
-              "mathematics_pl",
-              "mathematics_points",
-              "kiswahili",
-              "kiswahili_pl",
-              "kiswahili_points",
-              "creative_arts",
-              "creative_arts_pl",
-              "creative_arts_points",
-              "evrg",
-              "evrg_pl",
-              "evrg_points",
-            ].includes(k)
-          ) {
-            fields.push(`${k} = $${idx}`);
-            values.push(v === "" ? null : v);
-            idx++;
+        // Sanitize incoming values
+        const sanitized = {};
+        for (const [k, v] of Object.entries(req.body || {})) {
+          let val = Array.isArray(v) ? v[0] : v;
+          if (typeof val === 'string') val = val.trim();
+          sanitized[k] = val;
+        }
+
+        // Validate numeric subject scores (they may be present in the form)
+        const scoreValidation = validateSubjectScores(sanitized);
+        if (!scoreValidation.valid) return res.status(400).send(scoreValidation.message);
+
+        // Update only real `learners` columns
+        const learnerKeys = [
+          'name','assessment_number','adn_no','birth_certificate','grade','class_teacher','responsibility'
+        ];
+
+        const learnerFields = [];
+        const learnerValues = [];
+        let li = 1;
+        for (const k of learnerKeys) {
+          if (Object.prototype.hasOwnProperty.call(sanitized, k)) {
+            learnerFields.push(`${k} = $${li}`);
+            learnerValues.push(sanitized[k] === '' || sanitized[k] === undefined ? null : sanitized[k]);
+            li++;
           }
         }
 
-        if (fields.length === 0) return res.redirect("/learners");
-        values.push(req.params.id);
-        await db.query(
-          `UPDATE learners SET ${fields.join(", ")} WHERE id = $${idx}`,
-          values,
-        );
-        res.redirect("/learners");
+        if (learnerFields.length > 0) {
+          learnerValues.push(req.params.id);
+          await db.query(`UPDATE learners SET ${learnerFields.join(', ')} WHERE id = $${li}`, learnerValues);
+        }
+
+        // Upsert subject scores into learner_results (term defaults to '1')
+        const subjectKeys = [
+          'english','english_pl','english_points',
+          'kiswahili','kiswahili_pl','kiswahili_points',
+          'mathematics','mathematics_pl','mathematics_points',
+          'integrated_science','integrated_science_pl','integrated_science_points',
+          'agriculture','agriculture_pl','agriculture_points',
+          'social_studies','social_studies_pl','social_studies_points',
+          'cre','cre_pl','cre_points',
+          'pre_technical','pre_technical_pl','pre_technical_points',
+          'creative_arts','creative_arts_pl','creative_arts_points',
+          'evrg','evrg_pl','evrg_points'
+        ];
+
+        const term = sanitized.term || '1';
+        const subjectProvided = subjectKeys.some(k => Object.prototype.hasOwnProperty.call(sanitized, k) && sanitized[k] !== '' && sanitized[k] !== undefined);
+
+        if (subjectProvided) {
+          const cols = ['learner_id','term'];
+          const placeholders = ['$1','$2'];
+          const vals = [req.params.id, term];
+          let idx = 3;
+          for (const k of subjectKeys) {
+            cols.push(k);
+            placeholders.push(`$${idx}`);
+            vals.push(sanitized[k] === '' || sanitized[k] === undefined ? null : sanitized[k]);
+            idx++;
+          }
+
+          const insertSql = `INSERT INTO learner_results (${cols.join(',')}) VALUES (${placeholders.join(',')}) ON CONFLICT (learner_id, term) DO UPDATE SET ${subjectKeys.map(k => `${k}=EXCLUDED.${k}`).join(',')}`;
+          await db.query(insertSql, vals);
+        }
+
+        res.redirect('/learners');
       } catch (err) {
-        console.error("Update learner error:", err.message);
+        console.error("Update learner error:", err);
+        console.error('Request body:', req.body);
         res.status(500).send("Server error");
       }
     },

@@ -44,6 +44,7 @@ export default function registerExamRoutes(app) {
     const selectedTerm = ["1", "2", "3"].includes(term) ? term : "1";
     let learners = [];
     if (grade) {
+      const normalizedGrade = grade.toString().trim();
       const result = await db.query(
         `SELECT lr.id AS result_id, lr.learner_id, lr.term,
                 lr.english, lr.english_pl, lr.english_points, lr.english_cat1, lr.english_cat2, lr.english_main,
@@ -59,9 +60,9 @@ export default function registerExamRoutes(app) {
                 l.id AS learner_id, l.name, l.assessment_number, l.birth_certificate, l.class_teacher
          FROM learner_results lr
          JOIN learners l ON lr.learner_id = l.id
-         WHERE l.grade = $1 AND lr.term = $2
+         WHERE (LOWER(l.grade) = LOWER($1) OR LOWER(l.grade) = LOWER($3)) AND lr.term = $2
          ORDER BY l.name`,
-        [grade, selectedTerm]
+        [normalizedGrade, selectedTerm, `Grade ${normalizedGrade}`]
       );
       learners = result.rows;
 
@@ -471,13 +472,14 @@ export default function registerExamRoutes(app) {
       return res.render('error.ejs', { message: 'Grade is required for export' });
     }
 
+    const normalizedGrade = grade.toString().trim();
     const result = await db.query(
       `SELECT lr.*, l.name, l.assessment_number, l.grade AS learner_grade
        FROM learner_results lr
        JOIN learners l ON lr.learner_id = l.id
-       WHERE l.grade = $1 AND lr.term = $2
+       WHERE (LOWER(l.grade) = LOWER($1) OR LOWER(l.grade) = LOWER($3)) AND lr.term = $2
        ORDER BY l.name`,
-      [grade, selectedTerm]
+      [normalizedGrade, selectedTerm, `Grade ${normalizedGrade}`]
     );
 
 

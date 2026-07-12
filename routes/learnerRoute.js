@@ -198,10 +198,10 @@ export default function registerLearnerRoutes(app) {
       // Get all homework for learner's grade
       const homeworkResult = await db.query(
         `SELECT h.id, h.teacher_id, h.grade, h.subject, h.task_description, h.document_path, h.created_at,
-                u.name AS teacher_name,
+                COALESCE(u.name, 'Teacher') AS teacher_name,
                 hs.id AS submission_id, hs.answer_document_path, hs.teacher_score, hs.teacher_feedback, hs.submitted_at, hs.feedback_at
          FROM homework h
-         JOIN users u ON h.teacher_id = u.id
+         LEFT JOIN users u ON h.teacher_id = u.id
          LEFT JOIN homework_submissions hs ON h.id = hs.homework_id AND hs.learner_id = $1
          WHERE h.grade = $2
          ORDER BY h.created_at DESC`,
@@ -237,18 +237,17 @@ export default function registerLearnerRoutes(app) {
       );
       const userProfile = userResult.rows[0] || {};
       const learnerId = await resolveLearnerId(userProfile);
-
       if (!learnerId) {
-        return res.render("error.ejs", { message: "Unable to identify your learner record." });
+        console.warn(`Learner ID not found for user ${req.user.id}; viewing homework without submission context.`);
       }
 
       // Get homework details
       const homeworkResult = await db.query(
         `SELECT h.id, h.teacher_id, h.grade, h.subject, h.task_description, h.document_path, h.created_at,
-                u.name AS teacher_name,
+                COALESCE(u.name, 'Teacher') AS teacher_name,
                 hs.id AS submission_id, hs.answer_document_path, hs.teacher_score, hs.teacher_feedback, hs.submitted_at, hs.feedback_at
          FROM homework h
-         JOIN users u ON h.teacher_id = u.id
+         LEFT JOIN users u ON h.teacher_id = u.id
          LEFT JOIN homework_submissions hs ON h.id = hs.homework_id AND hs.learner_id = $1
          WHERE h.id = $2`,
         [learnerId, id],
@@ -290,10 +289,37 @@ export default function registerLearnerRoutes(app) {
           [req.user.id],
         );
         const userProfile = userResult.rows[0] || {};
-        const learnerId = await resolveLearnerId(userProfile);
+        let learnerId = await resolveLearnerId(userProfile);
 
+        // If resolveLearnerId couldn't find a mapping, try stricter lookups and as a last resort create a learner record.
         if (!learnerId) {
-          return res.render("error.ejs", { message: "Unable to identify your learner record." });
+          // Try lookup by assessment number if present
+          if (userProfile.assessment_number) {
+            const lookup = await db.query(
+              `SELECT id FROM learners WHERE assessment_number = $1 LIMIT 1`,
+              [userProfile.assessment_number.toString().trim()]
+            );
+            learnerId = lookup.rows[0]?.id || null;
+          }
+
+          // Try lookup by name
+          if (!learnerId && userProfile.name) {
+            const lookupByName = await db.query(
+              `SELECT id FROM learners WHERE LOWER(name) = LOWER($1) LIMIT 1`,
+              [userProfile.name.toString().trim()]
+            );
+            learnerId = lookupByName.rows[0]?.id || null;
+          }
+
+          // As a last resort, create a learner record so the submission can be associated
+          if (!learnerId) {
+            const created = await db.query(
+              `INSERT INTO learners (name, assessment_number, grade) VALUES ($1, $2, $3) RETURNING id`,
+              [userProfile.name || null, userProfile.assessment_number || null, userProfile.grade || null]
+            );
+            learnerId = created.rows[0]?.id || null;
+            console.warn(`Auto-created learner id=${learnerId} for user id=${req.user.id}`);
+          }
         }
 
         const existingSubmissionResult = await db.query(
