@@ -307,6 +307,101 @@ export default function registerAdminRoutes(app) {
     },
   );
 
+  app.get("/subjects", isAuthenticated, isManager, async (req, res) => {
+    try {
+      const result = await db.query("SELECT * FROM subjects ORDER BY id ASC");
+      res.render("adminDashboard.ejs", {
+        page: "subjects",
+        subjects: result.rows,
+      });
+    } catch (err) {
+      console.error("Get subjects error:", err.message);
+      res.status(500).send("Server error");
+    }
+  });
+
+  app.get("/subjects/add", isAuthenticated, isManager, (req, res) => {
+    res.render("addSubject.ejs");
+  });
+
+  app.post("/subjects/add", isAuthenticated, isManager, async (req, res) => {
+    try {
+      const { name, code, description } = req.body;
+      const normalizedCode = (code || name || '')
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9_]+/g, '_')
+        .replace(/^_+|_+$/g, '');
+      await db.query(
+        "INSERT INTO subjects (name, code, description) VALUES ($1, $2, $3)",
+        [name || null, normalizedCode || null, description || null],
+      );
+      res.redirect("/subjects");
+    } catch (err) {
+      console.error("Add subject error:", err.message);
+      res.status(500).send("Server error");
+    }
+  });
+
+  app.get(
+    "/subjects/:id/edit",
+    isAuthenticated,
+    isManager,
+    async (req, res) => {
+      try {
+        const { rows } = await db.query("SELECT * FROM subjects WHERE id = $1", [
+          req.params.id,
+        ]);
+        if (!rows[0]) return res.status(404).send("Subject not found");
+        res.render("editSubject.ejs", { subject: rows[0] });
+      } catch (err) {
+        console.error("Get subject error:", err.message);
+        res.status(500).send("Server error");
+      }
+    },
+  );
+
+  app.post(
+    "/subjects/:id/edit",
+    isAuthenticated,
+    isManager,
+    async (req, res) => {
+      try {
+        const { name, code, description } = req.body;
+        const normalizedCode = (code || name || '')
+          .toString()
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9_]+/g, '_')
+          .replace(/^_+|_+$/g, '');
+        await db.query(
+          "UPDATE subjects SET name = $1, code = $2, description = $3 WHERE id = $4",
+          [name || null, normalizedCode || null, description || null, req.params.id],
+        );
+        res.redirect("/subjects");
+      } catch (err) {
+        console.error("Update subject error:", err.message);
+        res.status(500).send("Server error");
+      }
+    },
+  );
+
+  app.post(
+    "/subjects/delete/:id",
+    isAuthenticated,
+    isManager,
+    async (req, res) => {
+      try {
+        await db.query("DELETE FROM subjects WHERE id = $1", [req.params.id]);
+        res.redirect("/subjects");
+      } catch (err) {
+        console.error("Delete subject error:", err.message);
+        res.status(500).send("Server error");
+      }
+    },
+  );
+
   app.get("/learners", isAuthenticated, isManager, async (req, res) => {
     try {
       const result = await db.query("SELECT * FROM learners ORDER BY id ASC");

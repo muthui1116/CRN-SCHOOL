@@ -1,0 +1,1 @@
+﻿const fs=require(" fs\);const ejs=require(\ejs\);const template=fs.readFileSync(\views/addExam.ejs\,\utf8\);try{ejs.compile(template,{filename:\views/addExam.ejs\});console.log(\compile ok\);}catch(err){console.error(err.stack);process.exit(1);}

@@ -41,6 +41,22 @@
           </div>
         </div>
 
+        <div class="row mb-4">
+          <div class="col-12 col-lg-8">
+            <label class="form-label fw-semibold">Subjects</label>
+            <div class="d-flex flex-wrap gap-2 mb-3" id="subjectButtonList"></div>
+            <div class="input-group input-group-sm">
+              <select id="subjectSelect" class="form-select form-select-sm">
+                <option value="">Add a subject</option>
+              </select>
+              <button type="button" id="addSubjectBtn" class="btn btn-outline-primary">Add</button>
+            </div>
+            <div class="form-text">Click a subject pill to remove it, or use the dropdown to add a subject back.</div>
+          </div>
+        </div>
+
+        <div id="selectedSubjectInputs"></div>
+
         <div class="table-responsive shadow-sm rounded overflow-auto">
           <table class="table table-bordered mb-0 align-middle">
             <thead class="table-secondary">
@@ -65,8 +81,10 @@
                 { key: 'creative_arts', label: 'Creative Arts' }
               ]; %>
               <% examSubjects.forEach(subject => { %>
-                <tr>
-                  <td class="fw-semibold"><%= subject.label %></td>
+                <tr class="subject-row" data-subject="<%= subject.key %>">
+                  <td class="fw-semibold">
+                    <span><%= subject.label %></span>
+                  </td>
                   <td class="text-center"><input type="number" name="<%= subject.key %>_cat1" class="form-control form-control-sm occasion-input text-center" min="0" max="100"></td>
                   <td class="text-center"><input type="number" name="<%= subject.key %>_cat2" class="form-control form-control-sm occasion-input text-center" min="0" max="100"></td>
                   <td class="text-center"><input type="number" name="<%= subject.key %>_main" class="form-control form-control-sm occasion-input text-center" min="0" max="100"></td>
@@ -108,8 +126,100 @@
         const learnerSelect = document.querySelector('[name="learner_id"]');
         const gradeSelect = document.getElementById('gradeSelect');
         const gradeInput = document.querySelector('input[name="grade"]');
+        const subjectSelect = document.getElementById('subjectSelect');
+        const addSubjectBtn = document.getElementById('addSubjectBtn');
+        const selectedSubjectInputs = document.getElementById('selectedSubjectInputs');
 
         const subjectKeys = () => examSubjects.map(subject => subject.key);
+
+        const setRowState = (row, enabled) => {
+          row.hidden = !enabled;
+          row.querySelectorAll('input').forEach(input => {
+            input.disabled = !enabled;
+            if (!enabled) input.value = '';
+          });
+        };
+
+        const subjectButtonList = document.getElementById('subjectButtonList');
+
+        const syncSelectedSubjectInputs = activeKeys => {
+          if (!selectedSubjectInputs) return;
+          selectedSubjectInputs.innerHTML = activeKeys.map(key => `<input type="hidden" name="selected_subjects[]" value="${key}">`).join('');
+        };
+
+        const activeSubjectKeys = () => Array.from(document.querySelectorAll('.subject-row:not([hidden])')).map(row => row.dataset.subject);
+
+        const renderSubjectButtons = () => {
+          if (!subjectButtonList) return;
+          const activeKeys = activeSubjectKeys();
+          subjectButtonList.innerHTML = activeKeys.map(key => {
+            const subject = examSubjects.find(subject => subject.key === key);
+            const label = subject ? subject.label : key;
+            return `
+              <button type="button" class="btn btn-sm btn-outline-danger subject-pill" data-subject="${key}">
+                ${label} <span aria-hidden="true">&times;</span>
+              </button>
+            `;
+          }).join('');
+          document.querySelectorAll('.subject-pill').forEach(button => {
+            button.addEventListener('click', () => removeSubjectRow(button.dataset.subject));
+          });
+        };
+
+        const updateSubjectOptions = () => {
+          if (!subjectSelect) return;
+          const selectedValue = subjectSelect.value;
+          const hiddenSubjects = examSubjects.filter(subject => {
+            const row = document.querySelector(`.subject-row[data-subject="${subject.key}"]`);
+            return row && row.hidden;
+          });
+
+          subjectSelect.innerHTML = '<option value="">Add a subject</option>';
+          hiddenSubjects.forEach(subject => {
+            const option = document.createElement('option');
+            option.value = subject.key;
+            option.textContent = subject.label;
+            if (subject.key === selectedValue) {
+              option.selected = true;
+            }
+            subjectSelect.appendChild(option);
+          });
+
+          if (selectedValue && !hiddenSubjects.some(subject => subject.key === selectedValue)) {
+            subjectSelect.value = '';
+          }
+          addSubjectBtn.disabled = hiddenSubjects.length === 0 || !subjectSelect.value;
+        };
+
+        const updateSubjectState = () => {
+          syncSelectedSubjectInputs(activeSubjectKeys());
+          updateSubjectOptions();
+          renderSubjectButtons();
+        };
+
+        const initializeSubjectRows = () => {
+          examSubjects.forEach(subject => {
+            const row = document.querySelector(`.subject-row[data-subject="${subject.key}"]`);
+            if (!row) return;
+            setRowState(row, false);
+          });
+          updateSubjectState();
+        };
+
+        const removeSubjectRow = key => {
+          const row = document.querySelector(`.subject-row[data-subject="${key}"]`);
+          if (!row) return;
+          setRowState(row, false);
+          updateFinal();
+          updateSubjectState();
+        };
+
+        const addSubjectRow = key => {
+          const row = document.querySelector(`.subject-row[data-subject="${key}"]`);
+          if (!row) return;
+          setRowState(row, true);
+          updateSubjectState();
+        };
 
         const parseScore = value => {
           if (value === '' || value === null || value === undefined) return null;
@@ -149,15 +259,20 @@
               learnerSelect.value = state.learner_id;
             }
             subjectKeys().forEach(subject => {
+              const row = document.querySelector(`.subject-row[data-subject="${subject}"]`);
               const cat1 = document.querySelector(`input[name="${subject}_cat1"]`);
               const cat2 = document.querySelector(`input[name="${subject}_cat2"]`);
               const main = document.querySelector(`input[name="${subject}_main"]`);
-              if (!cat1 || !cat2 || !main) return;
+              if (!cat1 || !cat2 || !main || !row) return;
               cat1.value = state.values[`${subject}_cat1`] || '';
               cat2.value = state.values[`${subject}_cat2`] || '';
               main.value = state.values[`${subject}_main`] || '';
+              if (cat1.value || cat2.value || main.value) {
+                setRowState(row, true);
+              }
             });
             updateFinal();
+            updateSubjectState();
             return true;
           } catch (err) {
             console.error('Failed to restore form state', err);
@@ -180,14 +295,18 @@
         const populateLearnerScores = learnerId => {
           const learner = learnersData.find(l => String(l.id) === String(learnerId) || String(l.learner_id) === String(learnerId));
           subjectKeys().forEach(subject => {
+            const row = document.querySelector(`.subject-row[data-subject="${subject}"]`);
             const cat1 = document.querySelector(`input[name="${subject}_cat1"]`);
             const cat2 = document.querySelector(`input[name="${subject}_cat2"]`);
             const main = document.querySelector(`input[name="${subject}_main"]`);
-            if (!cat1 || !cat2 || !main) return;
+            if (!cat1 || !cat2 || !main || !row) return;
             if (learner) {
               cat1.value = learner[`${subject}_cat1`] ?? '';
               cat2.value = learner[`${subject}_cat2`] ?? '';
               main.value = learner[`${subject}_main`] ?? '';
+              if (cat1.value || cat2.value || main.value) {
+                setRowState(row, true);
+              }
             } else {
               cat1.value = '';
               cat2.value = '';
@@ -195,6 +314,7 @@
             }
           });
           updateFinal();
+          updateSubjectState();
           saveFormState();
         };
 
@@ -216,6 +336,21 @@
         }
 
         gradeSelect?.addEventListener('change', changeGrade);
+        subjectSelect?.addEventListener('change', updateSubjectOptions);
+
+        addSubjectBtn?.addEventListener('click', () => {
+          const subjectKey = subjectSelect?.value;
+          if (!subjectKey) return;
+          addSubjectRow(subjectKey);
+          if (subjectSelect) subjectSelect.value = '';
+          updateSubjectOptions();
+        });
+
+        document.querySelectorAll('.remove-subject-btn').forEach(button => {
+          button.addEventListener('click', () => removeSubjectRow(button.dataset.subject));
+        });
+
+        initializeSubjectRows();
 
         document.addEventListener('input', event => {
           if (!event.target.matches('.occasion-input')) return;

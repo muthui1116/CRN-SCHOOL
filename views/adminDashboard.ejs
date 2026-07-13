@@ -22,6 +22,7 @@
           <option value="/grades" <%= page === 'grades' ? 'selected' : '' %>>Grades</option>
           <option value="/teachers" <%= page === 'teachers' ? 'selected' : '' %>>Teachers</option>
           <option value="/departments" <%= page === 'departments' ? 'selected' : '' %>>Departments</option>
+          <option value="/subjects" <%= page === 'subjects' ? 'selected' : '' %>>Subjects</option>
           <option value="/learners" <%= page === 'learners' ? 'selected' : '' %>>Learners</option>
         </select>
       </div>
@@ -46,6 +47,11 @@
         <span>Departments</span>
       </a>
 
+      <a href="/subjects" class="d-none d-md-flex align-items-center gap-2 px-3 py-2 text-decoration-none sidebar-link <%= page === 'subjects' ? 'active' : '' %>">
+        <i class="fas fa-book-open fa-sm text-secondary"></i>
+        <span>Subjects</span>
+      </a>
+
       <a href="/learners" class="d-none d-md-flex align-items-center gap-2 px-3 py-2 text-decoration-none sidebar-link <%= page === 'learners' ? 'active' : '' %>">
         <i class="fas fa-graduation-cap fa-sm text-secondary"></i>
         <span>Learners</span>
@@ -64,6 +70,8 @@
         <%- include('teachers.ejs') %>
       <% } else if (page === 'departments') { %>
         <%- include('departments.ejs') %>
+      <% } else if (page === 'subjects') { %>
+        <%- include('subjects.ejs') %>
       <% } else if (page === 'learners') { %>
         <%- include('learners.ejs') %>
       <% } %>

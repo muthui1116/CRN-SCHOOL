@@ -31,6 +31,29 @@ const examSubjectDefinitions = [
 ];
 const examSubjectKeys = examSubjectDefinitions.map(subject => subject.key);
 
+const normalizeSubjectCode = code =>
+  code
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+const getSubjectDefinitionsFromDb = async () => {
+  try {
+    const result = await db.query("SELECT name, code FROM subjects ORDER BY name ASC");
+    const subjects = result.rows
+      .map(row => {
+        const key = row.code ? normalizeSubjectCode(row.code) : normalizeSubjectCode(row.name);
+        return { key, label: row.name };
+      });
+    return subjects.length ? subjects : examSubjectDefinitions;
+  } catch (err) {
+    console.error('Failed to load subjects from DB:', err.message);
+    return examSubjectDefinitions;
+  }
+};
+
 const getSubjectDefinitionsForGrade = gradeValue => {
   if (gradeValue && Number.isInteger(Number(gradeValue))) {
     return examSubjectDefinitions;
@@ -154,15 +177,60 @@ export default function registerExamRoutes(app) {
         [selectedTerm]
       );
     }
-    const subjectDefinitions = getSubjectDefinitionsForGrade(grade);
-    res.render('addExam.ejs', { grade: grade || null, selectedTerm, learners: result.rows, selectedLearnerId, subjectDefinitions });
+    const learnerIds = result.rows.map(row => row.id);
+    let subjectRowMap = new Map();
+    if (learnerIds.length) {
+      const subjectResult = await db.query(
+        `SELECT learner_id, subject_code, subject_name, cat1, cat2, main
+         FROM learner_result_subjects
+         WHERE term = $1 AND learner_id = ANY($2)`,
+        [selectedTerm, learnerIds]
+      );
+      subjectResult.rows.forEach(row => {
+        const code = normalizeSubjectCode(row.subject_code);
+        const existing = subjectRowMap.get(row.learner_id) || {};
+        existing[code] = row;
+        subjectRowMap.set(row.learner_id, existing);
+      });
+    }
+    const dbSubjectDefinitions = await getSubjectDefinitionsFromDb();
+    const learnersWithSubjects = result.rows.map(row => ({
+      ...row,
+      subjectRows: subjectRowMap.get(row.id) || {}
+    }));
+    res.render('addExam.ejs', { grade: grade || null, selectedTerm, learners: learnersWithSubjects, selectedLearnerId, subjectDefinitions: dbSubjectDefinitions });
   });
 
   app.post('/exams/add', isAuthenticated, isTeacher, async (req, res) => {
-    const { learner_id, term, grade } = req.body;
+    const { learner_id, term, grade, selected_subjects } = req.body;
     const selectedTerm = ["1", "2", "3"].includes(term) ? term : "1";
     const selectedGrade = grade || null;
-    const subjectKeys = examSubjectKeys;
+    const dbSubjects = await getSubjectDefinitionsFromDb();
+    const subjectKeys = dbSubjects.map(subject => subject.key);
+    const fixedSubjectKeys = examSubjectKeys;
+
+    const requestedSubjects = Array.isArray(selected_subjects)
+      ? selected_subjects.map(String).map(s => s.trim()).filter(Boolean)
+      : (selected_subjects || '').split(',').map(s => s.trim()).filter(Boolean);
+
+    const subjectRows = await db.query("SELECT name, code FROM subjects");
+    const subjectMap = new Map(subjectRows.rows.map(row => {
+      const key = normalizeSubjectCode(row.code || row.name);
+      return [key, row.name];
+    }));
+
+    const postedSubjects = subjectKeys.filter(key => {
+      return [
+        req.body[`${key}_cat1`],
+        req.body[`${key}_cat2`],
+        req.body[`${key}_main`]
+      ].some(value => value !== undefined && value !== null && String(value).trim() !== '');
+    });
+
+    const activeSubjects = Array.from(new Set([
+      ...requestedSubjects,
+      ...postedSubjects
+    ]));
 
     const parseRawMark = value => {
       if (value === '' || value === null || value === undefined) return null;
@@ -192,6 +260,17 @@ export default function registerExamRoutes(app) {
 
     const g = {};
     for (const key of subjectKeys) {
+      const isActive = activeSubjects.includes(key);
+      if (!isActive) {
+        g[`${key}_cat1`] = null;
+        g[`${key}_cat2`] = null;
+        g[`${key}_main`] = null;
+        g[key] = null;
+        g[`${key}_pl`] = null;
+        g[`${key}_points`] = null;
+        continue;
+      }
+
       const providedCat1 = parseRawMark(req.body[`${key}_cat1`]);
       const providedCat2 = parseRawMark(req.body[`${key}_cat2`]);
       const providedMain = parseRawMark(req.body[`${key}_main`]);
@@ -215,10 +294,10 @@ export default function registerExamRoutes(app) {
       g[`${key}_points`] = points;
     }
 
-    const numericMarks = subjectKeys.map(k => (typeof g[k] === 'number' ? g[k] : NaN));
+    const numericMarks = subjectKeys.map(k => (activeSubjects.includes(k) && typeof g[k] === 'number' ? g[k] : NaN));
     const validMarks = numericMarks.filter(Number.isFinite);
-    const evrg = validMarks.length === 9
-      ? Math.round(validMarks.reduce((sum, n) => sum + n, 0) / 9)
+    const evrg = validMarks.length > 0
+      ? Math.round(validMarks.reduce((sum, n) => sum + n, 0) / validMarks.length)
       : null;
 
     const { pl: evrg_pl, points: evrg_points } = getGradeAndPoints(evrg);
@@ -326,6 +405,34 @@ export default function registerExamRoutes(app) {
           g.evrg, g.evrg_pl, g.evrg_points
         ]
       );
+
+      for (const subject of activeSubjects) {
+        const cat1 = parseRawMark(req.body[`${subject}_cat1`]);
+        const cat2 = parseRawMark(req.body[`${subject}_cat2`]);
+        const main = parseRawMark(req.body[`${subject}_main`]);
+        const finalMark = convertExamMark(cat1, cat2, main);
+        const { pl, points } = getGradeAndPoints(finalMark);
+        const subjectName = subjectMap.get(subject) || subject;
+
+        await db.query(
+          `INSERT INTO learner_result_subjects (
+            learner_id, term, subject_code, subject_name,
+            cat1, cat2, main, final_mark, pl, points
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          ON CONFLICT (learner_id, term, subject_code) DO UPDATE SET
+            subject_name = EXCLUDED.subject_name,
+            cat1 = EXCLUDED.cat1,
+            cat2 = EXCLUDED.cat2,
+            main = EXCLUDED.main,
+            final_mark = EXCLUDED.final_mark,
+            pl = EXCLUDED.pl,
+            points = EXCLUDED.points,
+            updated_at = NOW()
+          `,
+          [learner_id, selectedTerm, subject, subjectName, cat1 !== null ? String(cat1) : null, cat2 !== null ? String(cat2) : null, main !== null ? String(main) : null, finalMark !== null ? String(finalMark) : null, pl, points]
+        );
+      }
+
       const learnerResult = await db.query('SELECT grade FROM learners WHERE id=$1', [learner_id]);
       const gradeVal = learnerResult.rows[0]?.grade;
       res.redirect(`/exams?grade=${gradeVal}&term=${selectedTerm}`);
