@@ -191,10 +191,11 @@
           addSubjectBtn.disabled = hiddenSubjects.length === 0 || !subjectSelect.value;
         };
 
-        const updateSubjectState = () => {
+        const updateSubjectState = (shouldSave = true) => {
           syncSelectedSubjectInputs(activeSubjectKeys());
           updateSubjectOptions();
           renderSubjectButtons();
+          if (shouldSave) saveFormState();
         };
 
         const initializeSubjectRows = () => {
@@ -203,7 +204,7 @@
             if (!row) return;
             setRowState(row, false);
           });
-          updateSubjectState();
+          updateSubjectState(false);
         };
 
         const removeSubjectRow = key => {
@@ -235,13 +236,17 @@
           return Math.round((scoreCat1 / 100 * 15) + (scoreCat2 / 100 * 15) + (scoreMain / 100 * 70));
         };
 
-        const getStateKey = () => {
-          const learnerId = learnerSelect ? learnerSelect.value || 'none' : 'none';
-          return `exam_add_${gradeValue}_${selectedTermValue}_${learnerId}`;
+        const getStateKey = (learnerId = null) => {
+          const id = learnerId !== null ? learnerId : (learnerSelect ? learnerSelect.value || 'none' : 'none');
+          return `exam_add_${gradeValue}_${selectedTermValue}_${id}`;
         };
 
         const saveFormState = () => {
-          const state = { learner_id: learnerSelect ? learnerSelect.value : null, values: {} };
+          const state = {
+            learner_id: learnerSelect ? learnerSelect.value : null,
+            activeSubjects: activeSubjectKeys(),
+            values: {}
+          };
           subjectKeys().forEach(subject => {
             state.values[`${subject}_cat1`] = document.querySelector(`input[name="${subject}_cat1"]`)?.value || '';
             state.values[`${subject}_cat2`] = document.querySelector(`input[name="${subject}_cat2"]`)?.value || '';
@@ -250,26 +255,47 @@
           localStorage.setItem(getStateKey(), JSON.stringify(state));
         };
 
+        const findSavedState = () => {
+          const exact = localStorage.getItem(getStateKey());
+          if (exact) return exact;
+          const prefix = `exam_add_${gradeValue}_${selectedTermValue}_`;
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (typeof key === 'string' && key.startsWith(prefix)) {
+              return localStorage.getItem(key);
+            }
+          }
+          return null;
+        };
+
         const loadFormState = () => {
-          const saved = localStorage.getItem(getStateKey());
+          const saved = findSavedState();
           if (!saved) return false;
           try {
             const state = JSON.parse(saved);
             if (learnerSelect && state.learner_id && learnerSelect.querySelector(`option[value="${state.learner_id}"]`)) {
               learnerSelect.value = state.learner_id;
             }
+            const activeSubjects = Array.isArray(state.activeSubjects)
+              ? state.activeSubjects
+              : subjectKeys().filter(subject => {
+                  return (state.values && (
+                    state.values[`${subject}_cat1`] ||
+                    state.values[`${subject}_cat2`] ||
+                    state.values[`${subject}_cat1`]
+                  ));
+                });
             subjectKeys().forEach(subject => {
               const row = document.querySelector(`.subject-row[data-subject="${subject}"]`);
               const cat1 = document.querySelector(`input[name="${subject}_cat1"]`);
               const cat2 = document.querySelector(`input[name="${subject}_cat2"]`);
               const main = document.querySelector(`input[name="${subject}_main"]`);
               if (!cat1 || !cat2 || !main || !row) return;
-              cat1.value = state.values[`${subject}_cat1`] || '';
-              cat2.value = state.values[`${subject}_cat2`] || '';
-              main.value = state.values[`${subject}_main`] || '';
-              if (cat1.value || cat2.value || main.value) {
-                setRowState(row, true);
-              }
+              const isActive = activeSubjects.includes(subject);
+              setRowState(row, isActive);
+              cat1.value = (state.values && state.values[`${subject}_cat1`]) || '';
+              cat2.value = (state.values && state.values[`${subject}_cat2`]) || '';
+              main.value = (state.values && state.values[`${subject}_main`]) || '';
             });
             updateFinal();
             updateSubjectState();
