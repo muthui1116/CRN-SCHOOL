@@ -44,15 +44,21 @@
             <label class="form-label fw-semibold">Subject <span class="text-muted">(Optional)</span></label>
             <select name="subject" class="form-select form-select-sm">
               <option value="">Select a subject (optional)</option>
-              <option value="english">English</option>
-              <option value="kiswahili">Kiswahili</option>
-              <option value="mathematics">Mathematics</option>
-              <option value="integrated_science">Integrated Science</option>
-              <option value="agriculture">Agriculture</option>
-              <option value="social_studies">Social Studies</option>
-              <option value="cre">CRE</option>
-              <option value="pre_technical">Pre-Technical</option>
-              <option value="creative_arts">Creative Arts</option>
+              <% if (subjects && subjects.length) { %>
+                <% subjects.forEach(subject => { %>
+                  <option value="<%= subject.key %>"><%= subject.label %></option>
+                <% }) %>
+              <% } else { %>
+                <option value="english">English</option>
+                <option value="kiswahili">Kiswahili</option>
+                <option value="mathematics">Mathematics</option>
+                <option value="integrated_science">Integrated Science</option>
+                <option value="agriculture">Agriculture</option>
+                <option value="social_studies">Social Studies</option>
+                <option value="cre">CRE</option>
+                <option value="pre_technical">Pre-Technical</option>
+                <option value="creative_arts">Creative Arts</option>
+              <% } %>
             </select>
             <div class="form-text">Specify the subject if this homework is for a specific subject.</div>
           </div>

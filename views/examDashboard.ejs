@@ -183,15 +183,20 @@
                   <th>Class Teacher</th>
 
                   <!-- Subject columns — each has: mark | grade | points -->
-                  <th colspan="3" class="text-center border-start subject-header">English</th>
-                  <th colspan="3" class="text-center border-start subject-header">Kiswahili</th>
-                  <th colspan="3" class="text-center border-start subject-header">Mathematics</th>
-                  <th colspan="3" class="text-center border-start subject-header">Int. Science</th>
-                  <th colspan="3" class="text-center border-start subject-header">Agriculture</th>
-                  <th colspan="3" class="text-center border-start subject-header">Social Studies</th>
-                  <th colspan="3" class="text-center border-start subject-header">CRE</th>
-                  <th colspan="3" class="text-center border-start subject-header">Pre-Technical</th>
-                  <th colspan="3" class="text-center border-start subject-header">Creative Arts</th>
+                  <% const subjects = subjectDefinitions && subjectDefinitions.length ? subjectDefinitions : [
+                    { key: 'english', label: 'English' },
+                    { key: 'kiswahili', label: 'Kiswahili' },
+                    { key: 'mathematics', label: 'Mathematics' },
+                    { key: 'integrated_science', label: 'Int. Science' },
+                    { key: 'agriculture', label: 'Agriculture' },
+                    { key: 'social_studies', label: 'Social Studies' },
+                    { key: 'cre', label: 'CRE' },
+                    { key: 'pre_technical', label: 'Pre-Technical' },
+                    { key: 'creative_arts', label: 'Creative Arts' }
+                  ]; %>
+                  <% subjects.forEach(subject => { %>
+                    <th colspan="3" class="text-center border-start subject-header"><%= subject.label %></th>
+                  <% }) %>
                   <th colspan="3" class="text-center border-start subject-header">EVRG</th>
 
                   <th class="text-center border-start">Actions</th>
@@ -199,12 +204,14 @@
                 <!-- Sub-header row -->
                 <tr class="table-secondary sub-header">
                   <th colspan="6"></th>
-                  <% const subjects = 10; %>
-                  <% for (let s = 0; s < subjects; s++) { %>
+                  <% subjects.forEach(() => { %>
                     <th class="text-center border-start sub-col">MRK</th>
                     <th class="text-center sub-col">PL</th>
                     <th class="text-center sub-col">PTS</th>
-                  <% } %>
+                  <% }) %>
+                  <th class="text-center border-start sub-col">MRK</th>
+                  <th class="text-center sub-col">PL</th>
+                  <th class="text-center sub-col">PTS</th>
                   <th></th>
                 </tr>
               </thead>
@@ -218,50 +225,17 @@
                   <td><%= l.birth_certificate || 'N/A' %></td>
                   <td><%= l.class_teacher || 'N/A' %></td>
 
-                  <!-- English -->
-                  <td class="text-center border-start"><%= l.english || '—' %></td>
-                  <td class="text-center"><span class="grade-badge"><%= l.english_pl || '—' %></span></td>
-                  <td class="text-center"><%= l.english_points || '—' %></td>
-
-                  <!-- Kiswahili -->
-                  <td class="text-center border-start"><%= l.kiswahili || '—' %></td>
-                  <td class="text-center"><span class="grade-badge"><%= l.kiswahili_pl || '—' %></span></td>
-                  <td class="text-center"><%= l.kiswahili_points || '—' %></td>
-
-                  <!-- Mathematics -->
-                  <td class="text-center border-start"><%= l.mathematics || '—' %></td>
-                  <td class="text-center"><span class="grade-badge"><%= l.mathematics_pl || '—' %></span></td>
-                  <td class="text-center"><%= l.mathematics_points || '—' %></td>
-
-                  <!-- Integrated Science -->
-                  <td class="text-center border-start"><%= l.integrated_science || '—' %></td>
-                  <td class="text-center"><span class="grade-badge"><%= l.integrated_science_pl || '—' %></span></td>
-                  <td class="text-center"><%= l.integrated_science_points || '—' %></td>
-
-                  <!-- Agriculture -->
-                  <td class="text-center border-start"><%= l.agriculture || '—' %></td>
-                  <td class="text-center"><span class="grade-badge"><%= l.agriculture_pl || '—' %></span></td>
-                  <td class="text-center"><%= l.agriculture_points || '—' %></td>
-
-                  <!-- social_studies -->
-                  <td class="text-center border-start"><%= l.social_studies || '—' %></td>
-                  <td class="text-center"><span class="grade-badge"><%= l.social_studies_pl || '—' %></span></td>
-                  <td class="text-center"><%= l.social_studies_points || '—' %></td>
-
-                  <!-- CRE -->
-                  <td class="text-center border-start"><%= l.cre || '—' %></td>
-                  <td class="text-center"><span class="grade-badge"><%= l.cre_pl || '—' %></span></td>
-                  <td class="text-center"><%= l.cre_points || '—' %></td>
-
-                  <!-- Pre-Technical -->
-                  <td class="text-center border-start"><%= l.pre_technical || '—' %></td>
-                  <td class="text-center"><span class="grade-badge"><%= l.pre_technical_pl || '—' %></span></td>
-                  <td class="text-center"><%= l.pre_technical_points || '—' %></td>
-
-                  <!-- Creative Arts -->
-                  <td class="text-center border-start"><%= l.creative_arts || '—' %></td>
-                  <td class="text-center"><span class="grade-badge"><%= l.creative_arts_pl || '—' %></span></td>
-                  <td class="text-center"><%= l.creative_arts_points || '—' %></td>
+                  <% subjects.forEach(subject => {
+                    const code = subject.key;
+                    const subjectRow = l.subjectRows && l.subjectRows[code];
+                    const mark = subjectRow?.mark ?? l[code] ?? '—';
+                    const pl = subjectRow?.pl ?? l[`${code}_pl`] ?? '—';
+                    const points = subjectRow?.points ?? l[`${code}_points`] ?? '—';
+                  %>
+                    <td class="text-center border-start"><%= mark !== null && mark !== undefined && mark !== '' ? mark : '—' %></td>
+                    <td class="text-center"><span class="grade-badge"><%= pl || '—' %></span></td>
+                    <td class="text-center"><%= points || '—' %></td>
+                  <% }) %>
 
                   <!-- EVRG -->
                   <td class="text-center border-start"><%= l.evrg || '—' %></td>

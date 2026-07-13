@@ -85,9 +85,9 @@
                   <td class="fw-semibold">
                     <span><%= subject.label %></span>
                   </td>
-                  <td class="text-center"><input type="number" name="<%= subject.key %>_cat1" class="form-control form-control-sm occasion-input text-center" min="0" max="100"></td>
-                  <td class="text-center"><input type="number" name="<%= subject.key %>_cat2" class="form-control form-control-sm occasion-input text-center" min="0" max="100"></td>
-                  <td class="text-center"><input type="number" name="<%= subject.key %>_main" class="form-control form-control-sm occasion-input text-center" min="0" max="100"></td>
+                  <td class="text-center"><input type="number" name="<%= subject.key %>_cat1" class="form-control form-control-sm occasion-input text-center" min="0" max="100" step="1"></td>
+                  <td class="text-center"><input type="number" name="<%= subject.key %>_cat2" class="form-control form-control-sm occasion-input text-center" min="0" max="100" step="1"></td>
+                  <td class="text-center"><input type="number" name="<%= subject.key %>_main" class="form-control form-control-sm occasion-input text-center" min="0" max="100" step="1"></td>
                   <td class="text-center"><input type="text" class="form-control form-control-sm final-mark text-center" data-subject="<%= subject.key %>" readonly></td>
                 </tr>
               <% }) %>
@@ -228,6 +228,22 @@
           return Number.isFinite(n) ? n : null;
         };
 
+        const clampMarkInput = input => {
+          if (!input) return;
+          const value = input.value;
+          if (value === '' || value === null || value === undefined) return;
+          const n = Number(value);
+          if (!Number.isFinite(n)) {
+            input.value = '';
+            return;
+          }
+          if (n < 0) {
+            input.value = '0';
+          } else if (n > 100) {
+            input.value = '100';
+          }
+        };
+
         const getFinalMark = (cat1, cat2, main) => {
           if (cat1 === null && cat2 === null && main === null) return null;
           const scoreCat1 = cat1 || 0;
@@ -282,7 +298,7 @@
                   return (state.values && (
                     state.values[`${subject}_cat1`] ||
                     state.values[`${subject}_cat2`] ||
-                    state.values[`${subject}_cat1`]
+                    state.values[`${subject}_main`]
                   ));
                 });
             subjectKeys().forEach(subject => {
@@ -327,9 +343,16 @@
             const main = document.querySelector(`input[name="${subject}_main"]`);
             if (!cat1 || !cat2 || !main || !row) return;
             if (learner) {
-              cat1.value = learner[`${subject}_cat1`] ?? '';
-              cat2.value = learner[`${subject}_cat2`] ?? '';
-              main.value = learner[`${subject}_main`] ?? '';
+              const saved = learner.subjectRows && learner.subjectRows[subject];
+              if (saved) {
+                cat1.value = saved.cat1 ?? '';
+                cat2.value = saved.cat2 ?? '';
+                main.value = saved.main ?? '';
+              } else {
+                cat1.value = learner[`${subject}_cat1`] ?? '';
+                cat2.value = learner[`${subject}_cat2`] ?? '';
+                main.value = learner[`${subject}_main`] ?? '';
+              }
               if (cat1.value || cat2.value || main.value) {
                 setRowState(row, true);
               }
@@ -380,21 +403,22 @@
 
         document.addEventListener('input', event => {
           if (!event.target.matches('.occasion-input')) return;
+          clampMarkInput(event.target);
           updateFinal();
           saveFormState();
         });
 
         const restored = loadFormState();
-        if (restored && learnerSelect && learnerSelect.value) {
-          populateLearnerScores(learnerSelect.value);
-        } else if (learnerSelect && learnerSelect.value) {
-          populateLearnerScores(learnerSelect.value);
-        } else if (window.location.search.includes('learner_id=')) {
-          const params = new URLSearchParams(window.location.search);
-          const learnerId = params.get('learner_id');
-          if (learnerSelect && learnerId) {
-            learnerSelect.value = learnerId;
-            populateLearnerScores(learnerId);
+        if (!restored && learnerSelect) {
+          if (learnerSelect.value) {
+            populateLearnerScores(learnerSelect.value);
+          } else if (window.location.search.includes('learner_id=')) {
+            const params = new URLSearchParams(window.location.search);
+            const learnerId = params.get('learner_id');
+            if (learnerId) {
+              learnerSelect.value = learnerId;
+              populateLearnerScores(learnerId);
+            }
           }
         }
 

@@ -62,6 +62,14 @@ async function resolveLearnerId(userProfile) {
   return null;
 }
 
+const normalizeSubjectCode = code =>
+  code
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
 function isLearner(req, res, next) {
   if (req.isAuthenticated && req.isAuthenticated() && req.user && req.user.role === 3) {
     return next();
@@ -131,6 +139,32 @@ export default function registerLearnerRoutes(app) {
         learnerRecord = specificLearner.rows[0] || null;
       }
 
+      let subjectDefinitions = [];
+      let learnerSubjectRows = {};
+      if (learnerId) {
+        const subjectResult = await db.query(
+          `SELECT rs.subject_code, rs.subject_name, rs.final_mark, rs.pl, rs.points
+           FROM learner_result_subjects rs
+           WHERE rs.term = $1 AND rs.learner_id = $2
+           ORDER BY rs.subject_name ASC`,
+          [selectedTerm, learnerId],
+        );
+
+        subjectDefinitions = subjectResult.rows.map(row => {
+          const key = normalizeSubjectCode(row.subject_code || row.subject_name || '');
+          learnerSubjectRows[key] = {
+            mark: row.final_mark !== null ? row.final_mark : null,
+            pl: row.pl || null,
+            points: row.points || null,
+            label: row.subject_name || row.subject_code || ''
+          };
+          return {
+            key,
+            label: row.subject_name || row.subject_code || ''
+          };
+        });
+      }
+
       const homeworkResult = await db.query(
         `SELECT h.id, h.teacher_id, h.grade, h.subject, h.task_description, h.document_path, h.created_at,
                 u.name AS teacher_name,
@@ -162,6 +196,8 @@ export default function registerLearnerRoutes(app) {
         learnerRecord,
         selectedTerm,
         homeworkList,
+        subjectDefinitions,
+        learnerSubjectRows,
       });
     } catch (err) {
       console.error("Learner dashboard error:", err.message);

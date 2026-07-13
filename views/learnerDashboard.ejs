@@ -76,60 +76,25 @@
             <div class="d-none d-md-block table-responsive">
               <table class="table table-bordered align-middle mb-0">
                 <tbody>
-                  <tr>
-                    <td class="fw-semibold">English</td>
-                    <td><%= learnerRecord.english || '—' %></td>
-                    <td><span class="badge bg-info"><%= learnerRecord.english_pl || '—' %></span></td>
-                    <td><%= learnerRecord.english_points || '—' %> pts</td>
-                  </tr>
-                  <tr>
-                    <td class="fw-semibold">Kiswahili</td>
-                    <td><%= learnerRecord.kiswahili || '—' %></td>
-                    <td><span class="badge bg-info"><%= learnerRecord.kiswahili_pl || '—' %></span></td>
-                    <td><%= learnerRecord.kiswahili_points || '—' %> pts</td>
-                  </tr>
-                  <tr>
-                    <td class="fw-semibold">Mathematics</td>
-                    <td><%= learnerRecord.mathematics || '—' %></td>
-                    <td><span class="badge bg-info"><%= learnerRecord.mathematics_pl || '—' %></span></td>
-                    <td><%= learnerRecord.mathematics_points || '—' %> pts</td>
-                  </tr>
-                  <tr>
-                    <td class="fw-semibold">Integrated Science</td>
-                    <td><%= learnerRecord.integrated_science || '—' %></td>
-                    <td><span class="badge bg-info"><%= learnerRecord.integrated_science_pl || '—' %></span></td>
-                    <td><%= learnerRecord.integrated_science_points || '—' %> pts</td>
-                  </tr>
-                  <tr>
-                    <td class="fw-semibold">Agriculture</td>
-                    <td><%= learnerRecord.agriculture || '—' %></td>
-                    <td><span class="badge bg-info"><%= learnerRecord.agriculture_pl || '—' %></span></td>
-                    <td><%= learnerRecord.agriculture_points || '—' %> pts</td>
-                  </tr>
-                  <tr>
-                    <td class="fw-semibold">Social Studies</td>
-                    <td><%= learnerRecord.social_studies || '—' %></td>
-                    <td><span class="badge bg-info"><%= learnerRecord.social_studies_pl || '—' %></span></td>
-                    <td><%= learnerRecord.social_studies_points || '—' %> pts</td>
-                  </tr>
-                  <tr>
-                    <td class="fw-semibold">CRE</td>
-                    <td><%= learnerRecord.cre || '—' %></td>
-                    <td><span class="badge bg-info"><%= learnerRecord.cre_pl || '—' %></span></td>
-                    <td><%= learnerRecord.cre_points || '—' %> pts</td>
-                  </tr>
-                  <tr>
-                    <td class="fw-semibold">Pre-Technical</td>
-                    <td><%= learnerRecord.pre_technical || '—' %></td>
-                    <td><span class="badge bg-info"><%= learnerRecord.pre_technical_pl || '—' %></span></td>
-                    <td><%= learnerRecord.pre_technical_points || '—' %> pts</td>
-                  </tr>
-                  <tr>
-                    <td class="fw-semibold">Creative Arts</td>
-                    <td><%= learnerRecord.creative_arts || '—' %></td>
-                    <td><span class="badge bg-info"><%= learnerRecord.creative_arts_pl || '—' %></span></td>
-                    <td><%= learnerRecord.creative_arts_points || '—' %> pts</td>
-                  </tr>
+                  <% const displayedSubjects = subjectDefinitions && subjectDefinitions.length ? subjectDefinitions : [
+                    { key: 'english', label: 'English' },
+                    { key: 'kiswahili', label: 'Kiswahili' },
+                    { key: 'mathematics', label: 'Mathematics' },
+                    { key: 'integrated_science', label: 'Integrated Science' },
+                    { key: 'agriculture', label: 'Agriculture' },
+                    { key: 'social_studies', label: 'Social Studies' },
+                    { key: 'cre', label: 'CRE' },
+                    { key: 'pre_technical', label: 'Pre-Technical' },
+                    { key: 'creative_arts', label: 'Creative Arts' }
+                  ]; %>
+                  <% displayedSubjects.forEach(subject => { %>
+                    <tr>
+                      <td class="fw-semibold"><%= subject.label %></td>
+                      <td><%= learnerSubjectRows[subject.key]?.mark ?? '—' %></td>
+                      <td><span class="badge bg-info"><%= learnerSubjectRows[subject.key]?.pl || '—' %></span></td>
+                      <td><%= learnerSubjectRows[subject.key]?.points || '—' %> pts</td>
+                    </tr>
+                  <% }) %>
                   <tr class="table-primary fw-bold">
                     <td>Overall Average</td>
                     <td><%= learnerRecord.evrg || '—' %></td>
@@ -146,72 +111,21 @@
                 <div class="col">
                   <div class="card shadow-sm">
                     <div class="card-body p-3">
-                      <div class="row row-cols-2 row-cols-sm-4 g-3">
+                      <div class="row row-cols-1 g-3">
+                        <% displayedSubjects.forEach(subject => { %>
+                          <div class="col">
+                            <small class="d-block text-muted"><%= subject.label %></small>
+                            <div><strong><%= learnerSubjectRows[subject.key]?.mark ?? '—' %></strong></div>
+                            <small><span class="badge bg-info"><%= learnerSubjectRows[subject.key]?.pl || '—' %></span></small>
+                            <div class="small text-muted"><%= learnerSubjectRows[subject.key]?.points || '—' %> pts</div>
+                          </div>
+                        <% }) %>
                         <div class="col">
-                          <small class="d-block text-muted">English</small>
-                          <div><strong><%= learnerRecord.english || '—' %></strong></div>
-                          <small><span class="badge bg-info"><%= learnerRecord.english_pl || '—' %></span></small>
-                          <div class="small text-muted"><%= learnerRecord.english_points || '—' %> pts</div>
-                        </div>
-                        <div class="col">
-                          <small class="d-block text-muted">Kiswahili</small>
-                          <div><strong><%= learnerRecord.kiswahili || '—' %></strong></div>
-                          <small><span class="badge bg-info"><%= learnerRecord.kiswahili_pl || '—' %></span></small>
-                          <div class="small text-muted"><%= learnerRecord.kiswahili_points || '—' %> pts</div>
-                        </div>
-                        <div class="col">
-                          <small class="d-block text-muted">Mathematics</small>
-                          <div><strong><%= learnerRecord.mathematics || '—' %></strong></div>
-                          <small><span class="badge bg-info"><%= learnerRecord.mathematics_pl || '—' %></span></small>
-                          <div class="small text-muted"><%= learnerRecord.mathematics_points || '—' %> pts</div>
-                        </div>
-                        <div class="col">
-                          <small class="d-block text-muted">Int. Science</small>
-                          <div><strong><%= learnerRecord.integrated_science || '—' %></strong></div>
-                          <small><span class="badge bg-info"><%= learnerRecord.integrated_science_pl || '—' %></span></small>
-                          <div class="small text-muted"><%= learnerRecord.integrated_science_points || '—' %> pts</div>
-                        </div>
-                        <div class="col">
-                          <small class="d-block text-muted">Agriculture</small>
-                          <div><strong><%= learnerRecord.agriculture || '—' %></strong></div>
-                          <small><span class="badge bg-info"><%= learnerRecord.agriculture_pl || '—' %></span></small>
-                          <div class="small text-muted"><%= learnerRecord.agriculture_points || '—' %> pts</div>
-                        </div>
-                        <div class="col">
-                          <small class="d-block text-muted">Social Studies</small>
-                          <div><strong><%= learnerRecord.social_studies || '—' %></strong></div>
-                          <small><span class="badge bg-info"><%= learnerRecord.social_studies_pl || '—' %></span></small>
-                          <div class="small text-muted"><%= learnerRecord.social_studies_points || '—' %> pts</div>
-                        </div>
-                        <div class="col">
-                          <small class="d-block text-muted">CRE</small>
-                          <div><strong><%= learnerRecord.cre || '—' %></strong></div>
-                          <small><span class="badge bg-info"><%= learnerRecord.cre_pl || '—' %></span></small>
-                          <div class="small text-muted"><%= learnerRecord.cre_points || '—' %> pts</div>
-                        </div>
-                        <div class="col">
-                          <small class="d-block text-muted">Pre-Tech</small>
-                          <div><strong><%= learnerRecord.pre_technical || '—' %></strong></div>
-                          <small><span class="badge bg-info"><%= learnerRecord.pre_technical_pl || '—' %></span></small>
-                          <div class="small text-muted"><%= learnerRecord.pre_technical_points || '—' %> pts</div>
-                        </div>
-                        <div class="col">
-                          <small class="d-block text-muted">Creative Arts</small>
-                          <div><strong><%= learnerRecord.creative_arts || '—' %></strong></div>
-                          <small><span class="badge bg-info"><%= learnerRecord.creative_arts_pl || '—' %></span></small>
-                          <div class="small text-muted"><%= learnerRecord.creative_arts_points || '—' %> pts</div>
-                        </div>
-                      </div>
-                      <hr class="my-3">
-                      <div class="row">
-                        <div class="col-12">
-                          <div class="p-2 bg-light rounded">
-                            <small class="d-block text-muted">Overall Average</small>
-                            <div class="d-flex justify-content-between align-items-center">
-                              <strong><%= learnerRecord.evrg || '—' %></strong>
-                              <span class="badge bg-success"><%= learnerRecord.evrg_pl || '—' %></span>
-                              <span class="small text-muted"><%= learnerRecord.evrg_points || '—' %> pts</span>
-                            </div>
+                          <small class="d-block text-muted">Overall Average</small>
+                          <div class="d-flex justify-content-between align-items-center">
+                            <strong><%= learnerRecord.evrg || '—' %></strong>
+                            <span class="badge bg-success"><%= learnerRecord.evrg_pl || '—' %></span>
+                            <span class="small text-muted"><%= learnerRecord.evrg_points || '—' %> pts</span>
                           </div>
                         </div>
                       </div>
