@@ -85,6 +85,16 @@ export default function registerAdminRoutes(app) {
     }
   });
 
+  app.post("/grades/delete/:id", isAuthenticated, isManager, async (req, res) => {
+    try {
+      await db.query("DELETE FROM grade WHERE id = $1", [req.params.id]);
+      res.redirect("/grades");
+    } catch (err) {
+      console.error("Delete grade error:", err.message);
+      res.status(500).send("Server error");
+    }
+  });
+
   app.get("/teachers", isAuthenticated, isManager, async (req, res) => {
     try {
       let rows;

@@ -27,7 +27,7 @@ const examSubjectDefinitions = [
   { key: 'social_studies', label: 'Social Studies' },
   { key: 'cre', label: 'CRE' },
   { key: 'pre_technical', label: 'Pre-Technical' },
-  { key: 'creative_arts', label: 'Creative Arts' }
+  { key: 'creative_arts', label: 'Art and Craft' }
 ];
 const examSubjectKeys = examSubjectDefinitions.map(subject => subject.key);
 
@@ -52,6 +52,26 @@ const getSubjectDefinitionsFromDb = async () => {
     console.error('Failed to load subjects from DB:', err.message);
     return examSubjectDefinitions;
   }
+};
+
+const getSubjectDisplayLabel = (subjectValue, subjectDefinitions = []) => {
+  if (!subjectValue) {
+    return 'General';
+  }
+
+  const normalizedValue = normalizeSubjectCode(subjectValue);
+  const match = subjectDefinitions.find(def =>
+    normalizeSubjectCode(def.key) === normalizedValue ||
+    normalizeSubjectCode(def.label) === normalizedValue
+  );
+
+  if (match) {
+    return match.label;
+  }
+
+  return String(subjectValue)
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, char => char.toUpperCase());
 };
 
 const getSubjectDefinitionsForGrade = gradeValue => {
@@ -178,7 +198,10 @@ export default function registerExamRoutes(app) {
          ORDER BY hs.submitted_at DESC`,
         [grade, selectedTerm]
       );
-      submittedHomework = homeworkRows.rows;
+      submittedHomework = homeworkRows.rows.map(row => ({
+        ...row,
+        subject_name: getSubjectDisplayLabel(row.subject, subjectDefinitions)
+      }));
     }
 
     res.render('examDashboard.ejs', {
@@ -738,7 +761,8 @@ export default function registerExamRoutes(app) {
       'ASNO',
       'GRD',
       ...subjectDefinitions.flatMap(subject => [getShortSubjectLabel(subject.label), 'PL']),
-      'EVRG',
+      'AVRG',
+      'PL',
       'POS'
     ];
 
@@ -761,6 +785,7 @@ export default function registerExamRoutes(app) {
         cols.push(subjectRow.pl ?? '');
       }
       cols.push(row.evrg ?? '');
+      cols.push(row.evrg_pl ?? '');
       cols.push(row.pos ?? '');
 
       csv += cols.map(escapeCsv).join(',') + '\n';
@@ -972,7 +997,7 @@ export default function registerExamRoutes(app) {
             <tr>
               <th>#</th>
               <th>Name</th>
-              <th>Best Subject</th>
+              <th>Best Learning Area</th>
               <th>Mark</th>
               <th>Performance Level</th>
               <th>Points</th>
@@ -1008,7 +1033,7 @@ export default function registerExamRoutes(app) {
             <tr>
               <th>#</th>
               <th>Name</th>
-              <th>Best Subject</th>
+              <th>Best Learning Area</th>
               <th>Best Mark</th>
               <th>Overall Avg</th>
               <th>Improvement Gap</th>
@@ -1043,7 +1068,7 @@ export default function registerExamRoutes(app) {
         <h3>${learner.name || 'N/A'} — ${learner.grade || 'N/A'}</h3>
         <div><strong>Assessment #:</strong> ${learner.assessment_number || 'N/A'}</div>
         <div><strong>Birth Certificate:</strong> ${learner.birth_certificate || 'N/A'}</div>
-        <div><strong>Best Subject:</strong> <span class="label-pill">${learner.bestSubjectLabel || 'N/A'}</span></div>
+        <div><strong>Best Learning Area:</strong> <span class="label-pill">${learner.bestSubjectLabel || 'N/A'}</span></div>
         <div><strong>Overall Average:</strong> <span class="score">${learner.evrg !== null ? learner.evrg : 'N/A'}</span></div>
         <div><strong>Improvement Gap:</strong> <span class="score">${learner.improvementScore !== null ? learner.improvementScore : 'N/A'}</span></div>
 
@@ -1339,7 +1364,7 @@ export default function registerExamRoutes(app) {
       <table class="subjects-table">
         <thead>
           <tr>
-            <th>Subject</th>
+            <th>Learning Area</th>
             <th>Mark</th>
             <th>Performance Level</th>
           </tr>
@@ -1456,9 +1481,15 @@ export default function registerExamRoutes(app) {
         queryParams = [grade];
       }
 
+      const subjectDefinitions = await getSubjectDefinitionsFromDb();
       const submissions = await db.query(queryText, queryParams);
+      const submissionsWithLabels = submissions.rows.map(row => ({
+        ...row,
+        subject_name: getSubjectDisplayLabel(row.subject, subjectDefinitions)
+      }));
+
       res.render('homeworkSubmissions.ejs', {
-        submissions: submissions.rows,
+        submissions: submissionsWithLabels,
         selectedGrade: grade || null,
       });
     } catch (err) {
@@ -1488,8 +1519,14 @@ export default function registerExamRoutes(app) {
         return res.render('error.ejs', { message: 'Submission not found.' });
       }
 
+      const subjectDefinitions = await getSubjectDefinitionsFromDb();
+      const submission = {
+        ...result.rows[0],
+        subject_name: getSubjectDisplayLabel(result.rows[0].subject, subjectDefinitions)
+      };
+
       res.render('gradeHomeworkSubmission.ejs', {
-        submission: result.rows[0],
+        submission,
       });
     } catch (err) {
       console.error('Error loading submission grading form:', err);

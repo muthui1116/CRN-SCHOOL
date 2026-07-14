@@ -27,7 +27,7 @@
                 <dd class="col-sm-7"><%= submission.homework_grade %></dd>
 
                 <dt class="col-sm-5 text-muted">Subject</dt>
-                <dd class="col-sm-7"><%= submission.subject || 'General' %></dd>
+                <dd class="col-sm-7"><%= submission.subject_name || 'General' %></dd>
 
                 <dt class="col-sm-5 text-muted">Submitted</dt>
                 <dd class="col-sm-7"><%= new Date(submission.submitted_at).toLocaleDateString() %></dd>

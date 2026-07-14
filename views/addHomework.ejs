@@ -41,9 +41,9 @@
         <!-- Subject Selection (Optional) -->
         <div class="row gx-3 mb-4">
           <div class="col-12 col-lg-6">
-            <label class="form-label fw-semibold">Subject <span class="text-muted">(Optional)</span></label>
+            <label class="form-label fw-semibold">Learning Area <span class="text-muted">(Optional)</span></label>
             <select name="subject" class="form-select form-select-sm">
-              <option value="">Select a subject (optional)</option>
+              <option value="">Select a learning area (optional)</option>
               <% if (subjects && subjects.length) { %>
                 <% subjects.forEach(subject => { %>
                   <option value="<%= subject.key %>"><%= subject.label %></option>
@@ -57,10 +57,10 @@
                 <option value="social_studies">Social Studies</option>
                 <option value="cre">CRE</option>
                 <option value="pre_technical">Pre-Technical</option>
-                <option value="creative_arts">Creative Arts</option>
+                <option value="creative_arts">Art and Craft</option>
               <% } %>
             </select>
-            <div class="form-text">Specify the subject if this homework is for a specific subject.</div>
+            <div class="form-text">Specify the learning area if this homework is for a specific learning area.</div>
           </div>
         </div>
 

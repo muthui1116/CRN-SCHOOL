@@ -1,15 +1,15 @@
-<% title = "Subjects"; %>
+<% title = "Learning Areas"; %>
 <div class="row">
   <div class="col-12 col-sm-12">
     <div class="card shadow-sm border-0">
       <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
         <div>
-          <h3 class="mb-1">Subjects</h3>
-          <p class="mb-0 text-muted">Manage school subjects used across exams and student records.</p>
+          <h3 class="mb-1">Learning Areas</h3>
+          <p class="mb-0 text-muted">Manage school learning areas used across exams and student records.</p>
         </div>
         <div class="d-flex gap-2 flex-wrap align-items-center">
           <a href="/subjects" class="btn btn-sm btn-outline-secondary">Refresh</a>
-          <a href="/subjects/add" class="btn btn-sm btn-primary">Add Subject</a>
+          <a href="/subjects/add" class="btn btn-sm btn-primary">Add Learning Area</a>
         </div>
       </div>
       <div class="card-body">
@@ -27,7 +27,7 @@
             <tbody>
               <% if (!(subjects||[]).length) { %>
                 <tr>
-                  <td colspan="5" class="text-center text-muted py-4">No subjects found. Add a subject to get started.</td>
+                  <td colspan="5" class="text-center text-muted py-4">No learning areas found. Add one to get started.</td>
                 </tr>
               <% } else { %>
                 <% (subjects||[]).forEach(subject => { %>

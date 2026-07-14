@@ -43,15 +43,15 @@
 
         <div class="row mb-4">
           <div class="col-12 col-lg-8">
-            <label class="form-label fw-semibold">Subjects</label>
+            <label class="form-label fw-semibold">Learning Areas</label>
             <div class="d-flex flex-wrap gap-2 mb-3" id="subjectButtonList"></div>
             <div class="input-group input-group-sm">
               <select id="subjectSelect" class="form-select form-select-sm">
-                <option value="">Add a subject</option>
+                <option value="">Add a learning area</option>
               </select>
               <button type="button" id="addSubjectBtn" class="btn btn-outline-primary">Add</button>
             </div>
-            <div class="form-text">Click a subject pill to remove it, or use the dropdown to add a subject back.</div>
+            <div class="form-text">Click a learning area pill to remove it, or use the dropdown to add one back.</div>
           </div>
         </div>
 
@@ -61,7 +61,7 @@
           <table class="table table-bordered mb-0 align-middle">
             <thead class="table-secondary">
               <tr>
-                <th class="fw-semibold">Subject</th>
+                <th class="fw-semibold">Learning Area</th>
                 <th class="text-center fw-semibold">CAT1</th>
                 <th class="text-center fw-semibold">CAT2</th>
                 <th class="text-center fw-semibold">Main</th>
@@ -78,7 +78,7 @@
                 { key: 'social_studies', label: 'Social Studies' },
                 { key: 'cre', label: 'CRE' },
                 { key: 'pre_technical', label: 'Pre-Technical' },
-                { key: 'creative_arts', label: 'Creative Arts' }
+                { key: 'creative_arts', label: 'Art and Craft' }
               ]; %>
               <% examSubjects.forEach(subject => { %>
                 <tr class="subject-row" data-subject="<%= subject.key %>">
@@ -174,7 +174,7 @@
             return row && row.hidden;
           });
 
-          subjectSelect.innerHTML = '<option value="">Add a subject</option>';
+          subjectSelect.innerHTML = '<option value="">Add a Learning Area</option>';
           hiddenSubjects.forEach(subject => {
             const option = document.createElement('option');
             option.value = subject.key;

@@ -126,7 +126,7 @@
                   <tr>
                     <th style="min-width: 110px;" class="text-start">Learner</th>
                     <th style="min-width: 90px;" class="text-center">Assessment #</th>
-                    <th style="min-width: 100px;" class="text-center">Subject</th>
+                    <th style="min-width: 100px;" class="text-center">Learning Area</th>
                     <th style="min-width: 95px;" class="text-center">Submitted</th>
                     <th style="min-width: 110px;" class="text-center">Answer</th>
                     <th style="min-width: 80px;" class="text-center">Feedback</th>
@@ -137,7 +137,7 @@
                   <tr class="align-middle">
                     <td style="min-width: 110px;" class="text-start"><strong><%= hw.learner_name || 'N/A' %></strong></td>
                     <td style="min-width: 90px;" class="text-center"><span class="badge bg-light text-dark"><%= hw.assessment_number || 'N/A' %></span></td>
-                    <td style="min-width: 100px;" class="text-center"><span class="badge bg-info"><%= hw.subject ? hw.subject.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'General' %></span></td>
+                    <td style="min-width: 100px;" class="text-center"><span class="badge bg-info"><%= hw.subject_name || 'General' %></span></td>
                     <td style="min-width: 95px;" class="text-center"><small class="text-muted"><%= hw.submitted_at ? new Date(hw.submitted_at).toLocaleDateString() : '—' %></small></td>
                     <td style="min-width: 110px;" class="text-center">
                       <% if (hw.answer_document_path) { %>
@@ -192,7 +192,7 @@
                     { key: 'social_studies', label: 'Social Studies' },
                     { key: 'cre', label: 'CRE' },
                     { key: 'pre_technical', label: 'Pre-Technical' },
-                    { key: 'creative_arts', label: 'Creative Arts' }
+                    { key: 'creative_arts', label: 'Art and Craft' }
                   ]; %>
                   <% subjects.forEach(subject => { %>
                     <th colspan="3" class="text-center border-start subject-header"><%= subject.label %></th>

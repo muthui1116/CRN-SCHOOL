@@ -25,7 +25,7 @@
               <tr>
                 <th>Learner</th>
                 <th>Grade</th>
-                <th>Subject</th>
+                <th>Learning Area</th>
                 <th>Submitted</th>
                 <th>Score</th>
                 <th>Feedback</th>
@@ -37,7 +37,7 @@
                 <tr>
                   <td><%= submission.learner_name %></td>
                   <td><%= submission.homework_grade %></td>
-                  <td><%= submission.subject ? submission.subject.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'General' %></td>
+                  <td><%= submission.subject_name || 'General' %></td>
                   <td><%= submission.submitted_at ? new Date(submission.submitted_at).toLocaleDateString() : '—' %></td>
                   <td><%= submission.teacher_score !== null ? submission.teacher_score + '%' : 'Not graded' %></td>
                   <td><%= submission.teacher_feedback ? 'Yes' : 'No' %></td>
