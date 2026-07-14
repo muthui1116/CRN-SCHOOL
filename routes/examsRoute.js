@@ -907,7 +907,8 @@ export default function registerExamRoutes(app) {
     .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
     .card { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
     .card strong { display: block; margin-bottom: 8px; color: #333; }
-    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    .table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; min-width: 620px; }
     th, td { padding: 10px 12px; border: 1px solid #dfe3ea; text-align: left; }
     th { background: #1f4e79; color: white; font-weight: 600; }
     tbody tr:nth-child(even) { background: #f7f9fc; }
@@ -918,6 +919,24 @@ export default function registerExamRoutes(app) {
     .learner-block h3 { margin-bottom: 12px; font-size: 1rem; }
     .subject-table th, .subject-table td { text-align: center; }
     .subject-table .subject-name { text-align: left; }
+    @media (max-width: 768px) {
+      .page { padding: 12px; }
+      .summary-grid { grid-template-columns: 1fr; }
+      .card { padding: 12px; }
+      .title { font-size: 1.45rem; }
+      .subtitle { font-size: 0.95rem; }
+      .section { margin-top: 16px; }
+      .section h2 { font-size: 1rem; }
+      .page > div:first-child button { width: 100%; }
+    }
+    @media (max-width: 480px) {
+      .page { padding: 10px; }
+      .title { font-size: 1.2rem; }
+      .subtitle { font-size: 0.9rem; }
+      th, td { padding: 8px; font-size: 0.9rem; }
+      .learner-block h3 { font-size: 0.95rem; }
+      .label-pill { font-size: 0.8rem; }
+    }
     @media print {
       body { background: white; }
       .page { box-shadow: none; margin: 0; }
@@ -947,19 +966,20 @@ export default function registerExamRoutes(app) {
 
     <div class="section">
       <h2>Best In Rankings</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Name</th>
-            <th>Best Subject</th>
-            <th>Mark</th>
-            <th>Performance Level</th>
-            <th>Points</th>
-            <th>Overall Avg</th>
-          </tr>
-        </thead>
-        <tbody>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Name</th>
+              <th>Best Subject</th>
+              <th>Mark</th>
+              <th>Performance Level</th>
+              <th>Points</th>
+              <th>Overall Avg</th>
+            </tr>
+          </thead>
+          <tbody>
 `;
     bestInRankings.slice(0, 20).forEach((learner, idx) => {
       html += `
@@ -975,24 +995,26 @@ export default function registerExamRoutes(app) {
 `;
     });
     html += `
-        </tbody>
-      </table>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <div class="section">
       <h2>Most Improved Rankings</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Name</th>
-            <th>Best Subject</th>
-            <th>Best Mark</th>
-            <th>Overall Avg</th>
-            <th>Improvement Gap</th>
-          </tr>
-        </thead>
-        <tbody>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Name</th>
+              <th>Best Subject</th>
+              <th>Best Mark</th>
+              <th>Overall Avg</th>
+              <th>Improvement Gap</th>
+            </tr>
+          </thead>
+          <tbody>
 `;
     mostImprovedRankings.slice(0, 20).forEach((learner, idx) => {
       html += `
@@ -1007,8 +1029,9 @@ export default function registerExamRoutes(app) {
 `;
     });
     html += `
-        </tbody>
-      </table>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <div class="section">
@@ -1024,16 +1047,17 @@ export default function registerExamRoutes(app) {
         <div><strong>Overall Average:</strong> <span class="score">${learner.evrg !== null ? learner.evrg : 'N/A'}</span></div>
         <div><strong>Improvement Gap:</strong> <span class="score">${learner.improvementScore !== null ? learner.improvementScore : 'N/A'}</span></div>
 
-        <table class="subject-table">
-          <thead>
-            <tr>
-              <th>Subject</th>
-              <th>Mark</th>
-              <th>Performance</th>
-              <th>Points</th>
-            </tr>
-          </thead>
-          <tbody>
+        <div class="table-wrap">
+          <table class="subject-table">
+            <thead>
+              <tr>
+                <th>Subject</th>
+                <th>Mark</th>
+                <th>Performance</th>
+                <th>Points</th>
+              </tr>
+            </thead>
+            <tbody>
 `;
       learner.subjectRows.forEach(subject => {
         html += `
@@ -1046,8 +1070,9 @@ export default function registerExamRoutes(app) {
 `;
       });
       html += `
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+        </div>
       </div>
 `;
     });
@@ -1175,9 +1200,9 @@ export default function registerExamRoutes(app) {
     }
     .header .subtitle { font-size: 0.95rem; color: #666; }
     .learner-info {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
       margin-bottom: 2rem;
       background: #f9f9f9;
       padding: 1rem;
@@ -1185,19 +1210,26 @@ export default function registerExamRoutes(app) {
     }
     .info-row {
       display: flex;
-      justify-content: space-between;
-      padding: 0.5rem 0;
+      align-items: baseline;
+      gap: 0.2rem;
+      width: 100%;
+      padding: 0.35rem 0;
       border-bottom: 1px solid #eee;
     }
     .info-row:last-child { border-bottom: none; }
     .info-label {
       font-weight: 600;
       color: #333;
-      min-width: 140px;
+      flex-shrink: 0;
     }
     .info-value {
       color: #555;
-      text-align: right;
+      text-align: left;
+      flex: 1;
+      word-break: break-word;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .subjects-table {
       width: 100%;
