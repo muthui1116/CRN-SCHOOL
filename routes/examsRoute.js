@@ -817,9 +817,13 @@ export default function registerExamRoutes(app) {
     const subjectDefinitions = activeSubjectsResult.rows.length > 0
       ? activeSubjectsResult.rows.map(row => ({
           key: normalizeSubjectCode(row.subject_code || row.subject_name),
-          label: row.subject_name || row.subject_code
+          label: row.subject_name || row.subject_code,
+          code: row.subject_code || '-'
         }))
-      : examSubjectDefinitions;
+      : examSubjectDefinitions.map(subject => ({
+          ...subject,
+          code: subject.code || subject.key || '-'
+        }));
 
     const result = await db.query(
       `SELECT lr.id, lr.learner_id, lr.term, lr.evrg, lr.evrg_pl, lr.evrg_points, l.name, l.assessment_number, l.grade AS learner_grade, l.birth_certificate, l.class_teacher
@@ -862,6 +866,7 @@ export default function registerExamRoutes(app) {
       const marks = subjectDefinitions.map(subject => ({
         key: subject.key,
         label: subject.label,
+        code: subject.code || '-',
         mark: subjectRows[subject.key]?.mark ?? null
       }));
 
@@ -891,6 +896,7 @@ export default function registerExamRoutes(app) {
           const { pl, points } = getGradeAndPoints(item.mark);
           return {
             label: item.label,
+            code: item.code || '-',
             mark: item.mark !== null ? item.mark : '-',
             performance: pl || '-',
             points: points || '-'
@@ -923,18 +929,18 @@ export default function registerExamRoutes(app) {
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; color: #222; }
-    .page { width: 100%; max-width: 1100px; margin: 0 auto; padding: 24px; }
-    .header { text-align: center; margin-bottom: 24px; }
-    .title { font-size: 2rem; margin-bottom: 0.25rem; color: #1f4e79; }
-    .subtitle { font-size: 1rem; color: #555; }
-    .section { margin-top: 24px; }
-    .section h2 { font-size: 1.15rem; margin-bottom: 12px; color: #1f4e79; }
-    .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
-    .card { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
-    .card strong { display: block; margin-bottom: 8px; color: #333; }
+    .page { width: 100%; max-width: 1100px; margin: 0 auto; padding: 16px; }
+    .header { text-align: center; margin-bottom: 16px; }
+    .title { font-size: 1.8rem; margin-bottom: 0.25rem; color: #1f4e79; }
+    .subtitle { font-size: 0.95rem; color: #555; }
+    .section { margin-top: 18px; }
+    .section h2 { font-size: 1.05rem; margin-bottom: 10px; color: #1f4e79; }
+    .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+    .card { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .card strong { display: inline-block; margin-bottom: 0; color: #333; min-width: 120px; }
     .table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    table { width: 100%; border-collapse: collapse; margin-top: 12px; min-width: 620px; }
-    th, td { padding: 10px 12px; border: 1px solid #dfe3ea; text-align: left; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; min-width: 620px; }
+    th, td { padding: 8px 10px; border: 1px solid #dfe3ea; text-align: left; }
     th { background: #1f4e79; color: white; font-weight: 600; }
     tbody tr:nth-child(even) { background: #f7f9fc; }
     .label-pill { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #e9f2ff; color: #1f4e79; font-size: 0.85rem; }
@@ -944,7 +950,15 @@ export default function registerExamRoutes(app) {
     .learner-block h3 { margin-bottom: 12px; font-size: 1rem; }
     .subject-table th, .subject-table td { text-align: center; }
     .subject-table .subject-name { text-align: left; }
+    .meta-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .meta-wrap::-webkit-scrollbar { height: 8px; }
+    .meta-wrap::-webkit-scrollbar-track { background: transparent; }
+    .meta-wrap::-webkit-scrollbar-thumb { background: rgba(44, 90, 160, 0.6); border-radius: 4px; }
+    .learner-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; row-gap: 6px; margin-bottom: 10px; min-width: 100%; }
+    .meta-item { font-size: 0.92rem; line-height: 1.3; }
+    .meta-item strong { display: inline-block; min-width: 100px; font-weight: 600; }
     @media (max-width: 768px) {
+      .meta-wrap { margin-bottom: 8px; }
       .page { padding: 12px; }
       .summary-grid { grid-template-columns: 1fr; }
       .card { padding: 12px; }
@@ -963,10 +977,18 @@ export default function registerExamRoutes(app) {
       .label-pill { font-size: 0.8rem; }
     }
     @media print {
-      body { background: white; }
-      .page { box-shadow: none; margin: 0; }
+      body { background: white; -webkit-print-color-adjust: exact; }
+      .page, .report-form { box-shadow: none; margin: 0; max-width: 900px; }
       .section { page-break-inside: avoid; }
       .learner-block { page-break-inside: avoid; }
+      .page-break { page-break-after: always; }
+      /* Ensure scroll wrappers expand for printing */
+      .table-wrap, .info-wrap, .meta-wrap { overflow: visible !important; -webkit-overflow-scrolling: auto; }
+      /* Allow tables to expand and not force horizontal scrolling */
+      .subjects-table, .subject-table { min-width: 0 !important; width: 100% !important; }
+      /* Keep compact grid layout when printing */
+      .learner-info, .learner-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .back-button { display: none; }
     }
   </style>
 </head>
@@ -1066,17 +1088,22 @@ export default function registerExamRoutes(app) {
       html += `
       <div class="learner-block card">
         <h3>${learner.name || 'N/A'} — ${learner.grade || 'N/A'}</h3>
-        <div><strong>Assessment #:</strong> ${learner.assessment_number || 'N/A'}</div>
-        <div><strong>Birth Certificate:</strong> ${learner.birth_certificate || 'N/A'}</div>
-        <div><strong>Best Learning Area:</strong> <span class="label-pill">${learner.bestSubjectLabel || 'N/A'}</span></div>
-        <div><strong>Overall Average:</strong> <span class="score">${learner.evrg !== null ? learner.evrg : 'N/A'}</span></div>
-        <div><strong>Improvement Gap:</strong> <span class="score">${learner.improvementScore !== null ? learner.improvementScore : 'N/A'}</span></div>
+        <div class="meta-wrap">
+          <div class="learner-meta">
+            <div class="meta-item"><strong>Assessment #:</strong>${learner.assessment_number || 'N/A'}</div>
+            <div class="meta-item"><strong>Birth Certificate:</strong>${learner.birth_certificate || 'N/A'}</div>
+            <div class="meta-item"><strong>Best Learning Area:</strong><span class="label-pill">${learner.bestSubjectLabel || 'N/A'}</span></div>
+            <div class="meta-item"><strong>Overall Average:</strong><span class="score">${learner.evrg !== null ? learner.evrg : 'N/A'}</span></div>
+            <div class="meta-item"><strong>Improvement Gap:</strong><span class="score">${learner.improvementScore !== null ? learner.improvementScore : 'N/A'}</span></div>
+          </div>
+        </div>
 
         <div class="table-wrap">
           <table class="subject-table">
             <thead>
               <tr>
-                <th>Subject</th>
+                <th>Learning Area</th>
+                <th>Code</th>
                 <th>Mark</th>
                 <th>Performance</th>
                 <th>Points</th>
@@ -1088,6 +1115,7 @@ export default function registerExamRoutes(app) {
         html += `
             <tr>
               <td class="subject-name">${subject.label}</td>
+              <td>${subject.code}</td>
               <td>${subject.mark}</td>
               <td>${subject.performance}</td>
               <td>${subject.points}</td>
@@ -1130,18 +1158,19 @@ export default function registerExamRoutes(app) {
     const subjects = activeSubjectsResult.rows.length > 0
       ? activeSubjectsResult.rows.map(row => ({
           key: normalizeSubjectCode(row.subject_code || row.subject_name),
-          label: row.subject_name || row.subject_code
+          label: row.subject_name || row.subject_code,
+          code: row.subject_code || '-'
         }))
       : [
-          { key: 'english', label: 'English' },
-          { key: 'kiswahili', label: 'Kiswahili' },
-          { key: 'mathematics', label: 'Mathematics' },
-          { key: 'integrated_science', label: 'Integrated Science' },
-          { key: 'agriculture', label: 'Agriculture' },
-          { key: 'social_studies', label: 'Social Studies' },
-          { key: 'cre', label: 'CRE' },
-          { key: 'pre_technical', label: 'Pre-Technical' },
-          { key: 'creative_arts', label: 'Creative Arts' }
+          { key: 'english', label: 'English', code: 'ENG' },
+          { key: 'kiswahili', label: 'Kiswahili', code: 'KIS' },
+          { key: 'mathematics', label: 'Mathematics', code: 'MAT' },
+          { key: 'integrated_science', label: 'Integrated Science', code: 'SCI' },
+          { key: 'agriculture', label: 'Agriculture', code: 'AGR' },
+          { key: 'social_studies', label: 'Social Studies', code: 'SST' },
+          { key: 'cre', label: 'CRE', code: 'CRE' },
+          { key: 'pre_technical', label: 'Pre-Technical', code: 'PT' },
+          { key: 'creative_arts', label: 'Creative Arts', code: 'ART' }
         ];
 
     const result = await db.query(
@@ -1202,43 +1231,43 @@ export default function registerExamRoutes(app) {
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; }
-    .page-break { page-break-after: always; margin-bottom: 2rem; }
+    .page-break { page-break-after: always; margin-bottom: 1rem; }
     .report-form {
       background: white;
-      padding: 2rem;
-      margin: 0 auto 2rem;
+      padding: 1rem;
+      margin: 0 auto 1rem;
       max-width: 900px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
       border: 1px solid #ddd;
     }
     .header {
       text-align: center;
-      margin-bottom: 2rem;
-      border-bottom: 3px solid #2c5aa0;
-      padding-bottom: 1rem;
+      margin-bottom: 1rem;
+      border-bottom: 2px solid #2c5aa0;
+      padding-bottom: 0.75rem;
     }
     .header h1 {
-      font-size: 1.8rem;
+      font-size: 1.4rem;
       color: #2c5aa0;
       font-weight: 700;
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.35rem;
     }
-    .header .subtitle { font-size: 0.95rem; color: #666; }
+    .header .subtitle { font-size: 0.85rem; color: #666; }
     .learner-info {
-      display: flex;
-      flex-direction: column;
-      gap: 0.25rem;
-      margin-bottom: 2rem;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.5rem 1rem;
+      margin-bottom: 1rem;
       background: #f9f9f9;
-      padding: 1rem;
+      padding: 0.75rem;
       border-radius: 4px;
     }
     .info-row {
       display: flex;
       align-items: baseline;
-      gap: 0.2rem;
+      gap: 0;
       width: 100%;
-      padding: 0.35rem 0;
+      padding: 0.15rem 0;
       border-bottom: 1px solid #eee;
     }
     .info-row:last-child { border-bottom: none; }
@@ -1246,6 +1275,7 @@ export default function registerExamRoutes(app) {
       font-weight: 600;
       color: #333;
       flex-shrink: 0;
+      min-width: 0;
     }
     .info-value {
       color: #555;
@@ -1255,26 +1285,62 @@ export default function registerExamRoutes(app) {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      font-size: 0.95rem;
+    }
+    .info-wrap,
+    .table-wrap {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(44, 90, 160, 0.6) transparent;
+      margin-top: 0.75rem;
+    }
+    .info-wrap::-webkit-scrollbar,
+    .table-wrap::-webkit-scrollbar {
+      height: 8px;
+    }
+    .info-wrap::-webkit-scrollbar-track,
+    .table-wrap::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .info-wrap::-webkit-scrollbar-thumb,
+    .table-wrap::-webkit-scrollbar-thumb {
+      background: rgba(44, 90, 160, 0.6);
+      border-radius: 4px;
+    }
+    .table-wrap::-webkit-scrollbar {
+      height: 8px;
+    }
+    .table-wrap::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .table-wrap::-webkit-scrollbar-thumb {
+      background: rgba(44, 90, 160, 0.6);
+      border-radius: 4px;
     }
     .subjects-table {
       width: 100%;
+      min-width: 100%;
       border-collapse: collapse;
-      margin-top: 1.5rem;
+      margin-top: 0;
     }
     .subjects-table thead {
       background: #2c5aa0;
       color: white;
     }
     .subjects-table th {
-      padding: 0.75rem;
+      padding: 0.5rem 0.65rem;
       text-align: left;
       font-weight: 600;
       border: 1px solid #2c5aa0;
+      font-size: 0.9rem;
     }
     .subjects-table td {
-      padding: 0.75rem;
+      padding: 0.45rem 0.65rem;
       border: 1px solid #ddd;
       text-align: center;
+      font-size: 0.9rem;
     }
     .subjects-table tbody tr:nth-child(even) {
       background: #f9f9f9;
@@ -1287,7 +1353,13 @@ export default function registerExamRoutes(app) {
       font-weight: 500;
       color: #333;
     }
+    .subject-code {
+      text-align: left;
+      color: #555;
+      font-weight: 500;
+    }
     .mark { color: #2c5aa0; font-weight: 600; }
+    .pl { color: #28a745; font-weight: 600; }
     .pl { color: #28a745; font-weight: 600; }
     .overall-row {
       background: #e8f0ff;
@@ -1297,11 +1369,11 @@ export default function registerExamRoutes(app) {
       border: 2px solid #2c5aa0;
     }
     .footer {
-      margin-top: 2rem;
-      padding-top: 1rem;
+      margin-top: 1rem;
+      padding-top: 0.75rem;
       border-top: 1px solid #ddd;
       text-align: center;
-      font-size: 0.85rem;
+      font-size: 0.82rem;
       color: #999;
     }
     .back-button {
@@ -1318,10 +1390,42 @@ export default function registerExamRoutes(app) {
     .back-button:hover {
       background: #5a6268;
     }
+    @media (max-width: 768px) {
+      body { padding: 0 0.5rem; }
+      .report-form {
+        padding: 0.75rem;
+        margin-bottom: 0.75rem;
+      }
+      .header h1 { font-size: 1.3rem; }
+      .header .subtitle { font-size: 0.8rem; }
+      .learner-info { grid-template-columns: 1fr; gap: 0.4rem; padding: 0.6rem; }
+      .info-row { padding: 0.1rem 0; }
+      .info-label { min-width: 90px; font-size: 0.92rem; }
+      .info-value { font-size: 0.92rem; }
+      .subjects-table th,
+      .subjects-table td { padding: 0.4rem 0.5rem; font-size: 0.86rem; }
+      .subjects-table { margin-top: 0.6rem; }
+      .back-button { width: 100%; }
+    }
+    @media (max-width: 480px) {
+      .page-break { margin-bottom: 0.5rem; }
+      .report-form { padding: 0.55rem; }
+      .header h1 { font-size: 1.15rem; }
+      .header .subtitle { font-size: 0.75rem; }
+      .info-label { min-width: 70px; font-size: 0.88rem; }
+      .info-value { font-size: 0.88rem; }
+      .subjects-table th,
+      .subjects-table td { padding: 0.3rem 0.45rem; font-size: 0.82rem; }
+      .subjects-table { min-width: 600px; }
+    }
     @media print {
-      body { background: white; }
+      body { background: white; -webkit-print-color-adjust: exact; }
       .page-break { page-break-after: always; }
-      .report-form { box-shadow: none; margin-bottom: 0; }
+      .report-form { box-shadow: none; margin-bottom: 0; max-width: 900px; }
+      /* Expand scroll wrappers so content prints fully */
+      .table-wrap, .info-wrap, .meta-wrap { overflow: visible !important; -webkit-overflow-scrolling: auto; }
+      .subjects-table, .subject-table { min-width: 0 !important; width: 100% !important; }
+      .learner-info, .learner-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .back-button { display: none; }
     }
   </style>
@@ -1338,37 +1442,33 @@ export default function registerExamRoutes(app) {
         <div class="subtitle">KAITHANGO COMPREHENSIVE SCHOOL</div>
       </div>
 
-      <div class="learner-info">
-        <div>
+      <div class="info-wrap">
+        <div class="learner-info">
           <div class="info-row">
-            <span class="info-label">Learner Name:</span>
-            <span class="info-value">${learner.name || 'N/A'}</span>
+            <span class="info-label">Learner Name:&nbsp;</span><span class="info-value">${learner.name || 'N/A'}</span>
           </div>
           <div class="info-row">
-            <span class="info-label">Grade:</span>
-            <span class="info-value">${learner.grade || 'N/A'}</span>
-          </div>
-        </div>
-        <div>
-          <div class="info-row">
-            <span class="info-label">Assessment #:</span>
-            <span class="info-value">${learner.assessment_number || 'N/A'}</span>
+            <span class="info-label">Assessment #:&nbsp;</span><span class="info-value">${learner.assessment_number || 'N/A'}</span>
           </div>
           <div class="info-row">
-            <span class="info-label">Date:</span>
-            <span class="info-value">${currentDate}</span>
+            <span class="info-label">Grade:&nbsp;</span><span class="info-value">${learner.grade || 'N/A'}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Date:&nbsp;</span><span class="info-value">${currentDate}</span>
           </div>
         </div>
       </div>
 
-      <table class="subjects-table">
-        <thead>
-          <tr>
-            <th>Learning Area</th>
-            <th>Mark</th>
-            <th>Performance Level</th>
-          </tr>
-        </thead>
+      <div class="table-wrap">
+        <table class="subjects-table">
+          <thead>
+            <tr>
+              <th>Learning Area</th>
+              <th>Code</th>
+              <th>Mark</th>
+              <th>Performance Level</th>
+            </tr>
+          </thead>
         <tbody>
 `;
       subjects.forEach(subj => {
@@ -1380,6 +1480,7 @@ export default function registerExamRoutes(app) {
         html += `
           <tr ${isOverall ? 'class="overall-row"' : ''}>
             <td class="subject-name">${subj.label}</td>
+            <td class="subject-code">${subj.code || '-'}</td>
             <td class="mark">${mark}</td>
             <td class="pl">${pl}</td>
           </tr>
@@ -1388,7 +1489,8 @@ export default function registerExamRoutes(app) {
 
       html += `
         </tbody>
-      </table>
+        </table>
+      </div>
 
       <div class="footer">
         <p>Generated on ${currentDate} | Exam Results Report</p>
