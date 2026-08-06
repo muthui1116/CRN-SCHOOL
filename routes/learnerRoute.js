@@ -106,6 +106,8 @@ export default function registerLearnerRoutes(app) {
       }
 
       const selectedTerm = ["1", "2", "3"].includes(req.query.term) ? req.query.term : "1";
+      const assessmentType = req.query.assessment === 'summative' ? 'summative' : 'continous';
+      const showContinuousAssessment = assessmentType === 'continous';
 
       let learnerId = null;
 
@@ -127,42 +129,87 @@ export default function registerLearnerRoutes(app) {
         userProfile.grade = userProfile.grade || learnerRow.rows[0]?.grade;
       }
 
-      if (learnerId) {
-        const specificLearner = await db.query(
-          `SELECT lr.*, l.name, l.grade AS learner_grade, l.assessment_number, l.birth_certificate, l.class_teacher
-           FROM learner_results lr
-           JOIN learners l ON lr.learner_id = l.id
-           WHERE lr.learner_id = $1 AND lr.term = $2
-           LIMIT 1`,
-          [learnerId, selectedTerm],
-        );
-        learnerRecord = specificLearner.rows[0] || null;
-      }
-
       let subjectDefinitions = [];
       let learnerSubjectRows = {};
       if (learnerId) {
-        const subjectResult = await db.query(
-          `SELECT rs.subject_code, rs.subject_name, rs.final_mark, rs.pl, rs.points
-           FROM learner_result_subjects rs
-           WHERE rs.term = $1 AND rs.learner_id = $2
-           ORDER BY rs.subject_name ASC`,
-          [selectedTerm, learnerId],
-        );
+        if (assessmentType === 'summative') {
+          const specificLearner = await db.query(
+            `SELECT lr.*, l.name, l.grade AS learner_grade, l.assessment_number, l.birth_certificate, l.class_teacher
+             FROM learner_results lr
+             JOIN learners l ON lr.learner_id = l.id
+             WHERE lr.learner_id = $1 AND lr.term = $2
+             LIMIT 1`,
+            [learnerId, selectedTerm],
+          );
+          learnerRecord = specificLearner.rows[0] || null;
 
-        subjectDefinitions = subjectResult.rows.map(row => {
-          const key = normalizeSubjectCode(row.subject_code || row.subject_name || '');
-          learnerSubjectRows[key] = {
-            mark: row.final_mark !== null ? row.final_mark : null,
-            pl: row.pl || null,
-            points: row.points || null,
-            label: row.subject_name || row.subject_code || ''
+          const subjectLabels = {
+            english: 'English',
+            kiswahili: 'Kiswahili',
+            mathematics: 'Mathematics',
+            integrated_science: 'Integrated Science',
+            agriculture: 'Agriculture',
+            social_studies: 'Social Studies',
+            cre: 'CRE',
+            pre_technical: 'Pre-Technical',
+            creative_arts: 'Art and Craft'
           };
-          return {
-            key,
-            label: row.subject_name || row.subject_code || ''
-          };
-        });
+
+          subjectDefinitions = Object.entries(subjectLabels).map(([key, label]) => ({ key, label }));
+
+          if (learnerRecord) {
+            subjectDefinitions.forEach(subject => {
+              learnerSubjectRows[subject.key] = {
+                mark: learnerRecord[subject.key] !== null ? learnerRecord[subject.key] : null,
+                pl: learnerRecord[`${subject.key}_pl`] || null,
+                points: learnerRecord[`${subject.key}_points`] || null,
+                ee: null,
+                ae: null,
+                me: null,
+                be: null,
+                reflection: null,
+                strand: null,
+                sub_strand: null,
+                lesson_title: null,
+                label: subject.label
+              };
+            });
+          }
+        } else {
+          const subjectResult = await db.query(
+            `SELECT rs.subject_code, rs.subject_name, rs.final_mark, rs.pl, rs.points,
+                    rs.ee, rs.ae, rs.me, rs.be, rs.reflection,
+                    rs.strand, rs.sub_strand, rs.lesson_title
+             FROM learner_result_subjects rs
+             WHERE rs.term = $1 AND rs.learner_id = $2
+             ORDER BY rs.subject_name ASC`,
+            [selectedTerm, learnerId],
+          );
+
+          subjectDefinitions = subjectResult.rows.map(row => {
+            const key = normalizeSubjectCode(row.subject_code || row.subject_name || '');
+            learnerSubjectRows[key] = {
+              mark: row.final_mark !== null ? row.final_mark : null,
+              pl: row.pl || null,
+              points: row.points || null,
+              code: row.subject_code || row.subject_name || null,
+              ee: row.ee || null,
+              ae: row.ae || null,
+              me: row.me || null,
+              be: row.be || null,
+              reflection: row.reflection || null,
+              strand: row.strand || null,
+              sub_strand: row.sub_strand || null,
+              lesson_title: row.lesson_title || null,
+              label: row.subject_name || row.subject_code || ''
+            };
+            return {
+              key,
+              label: row.subject_name || row.subject_code || '',
+              code: row.subject_code || row.subject_name || ''
+            };
+          });
+        }
       }
 
       const homeworkResult = await db.query(
@@ -198,6 +245,8 @@ export default function registerLearnerRoutes(app) {
         homeworkList,
         subjectDefinitions,
         learnerSubjectRows,
+        assessmentType,
+        showContinuousAssessment,
       });
     } catch (err) {
       console.error("Learner dashboard error:", err.message);

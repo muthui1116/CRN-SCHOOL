@@ -75,7 +75,15 @@
                 </div>
               </div>
               <div class="col-12 col-sm-6 col-lg-auto">
-                <a href="/exams/add?grade=<%= selectedGrade %>&term=<%= selectedTerm %>" class="btn btn-sm btn-primary w-100 w-lg-auto">Add Result</a>
+                <div class="dropdown">
+                  <button class="btn btn-sm btn-primary dropdown-toggle w-100 w-lg-auto" type="button" id="addResultDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                    Add Result
+                  </button>
+                  <ul class="dropdown-menu" aria-labelledby="addResultDropdown">
+                    <li><a class="dropdown-item" href="/exams/add?grade=<%= selectedGrade %>&term=<%= selectedTerm %>&assessment=continous">Continous Ass</a></li>
+                    <li><a class="dropdown-item" href="/exams/add?grade=<%= selectedGrade %>&term=<%= selectedTerm %>&assessment=summative">Summative Ass</a></li>
+                  </ul>
+                </div>
               </div>
               <div class="col-12 col-sm-6 col-lg-auto">
                 <a href="/exams/homework" class="btn btn-sm btn-success w-100 w-lg-auto">

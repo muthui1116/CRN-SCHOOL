@@ -14,6 +14,7 @@
       <form action="/exams/add" method="POST">
         <input type="hidden" name="grade" value="<%= grade %>">
         <input type="hidden" name="term" value="<%= selectedTerm %>">
+        <input type="hidden" name="assessment_type" value="<%= assessmentType || 'continous' %>">
 
         <div class="row gx-3 mb-4">
           <div class="col-12 col-lg-6">
@@ -58,18 +59,7 @@
         <div id="selectedSubjectInputs"></div>
 
         <div class="table-responsive shadow-sm rounded overflow-auto">
-          <table class="table table-bordered mb-0 align-middle">
-            <thead class="table-secondary">
-              <tr>
-                <th class="fw-semibold">Learning Area</th>
-                <th class="text-center fw-semibold">CAT1</th>
-                <th class="text-center fw-semibold">CAT2</th>
-                <th class="text-center fw-semibold">Main</th>
-                <th class="text-center fw-semibold">Final</th>
-              </tr>
-            </thead>
-            <tbody>
-              <% const examSubjects = subjectDefinitions && subjectDefinitions.length ? subjectDefinitions : [
+          <% const examSubjects = subjectDefinitions && subjectDefinitions.length ? subjectDefinitions : [
                 { key: 'english', label: 'English' },
                 { key: 'kiswahili', label: 'Kiswahili' },
                 { key: 'mathematics', label: 'Mathematics' },
@@ -80,19 +70,91 @@
                 { key: 'pre_technical', label: 'Pre-Technical' },
                 { key: 'creative_arts', label: 'Art and Craft' }
               ]; %>
-              <% examSubjects.forEach(subject => { %>
-                <tr class="subject-row" data-subject="<%= subject.key %>">
-                  <td class="fw-semibold">
-                    <span><%= subject.label %></span>
-                  </td>
-                  <td class="text-center"><input type="number" name="<%= subject.key %>_cat1" class="form-control form-control-sm occasion-input text-center" min="0" max="100" step="1"></td>
-                  <td class="text-center"><input type="number" name="<%= subject.key %>_cat2" class="form-control form-control-sm occasion-input text-center" min="0" max="100" step="1"></td>
-                  <td class="text-center"><input type="number" name="<%= subject.key %>_main" class="form-control form-control-sm occasion-input text-center" min="0" max="100" step="1"></td>
-                  <td class="text-center"><input type="text" class="form-control form-control-sm final-mark text-center" data-subject="<%= subject.key %>" readonly></td>
+
+          <% if (assessmentType === 'continous') { %>
+            <table class="table table-bordered mb-0 align-middle">
+              <thead class="table-secondary">
+                <tr>
+                  <th class="fw-semibold">Learning Area</th>
+                  <th class="fw-semibold">Strand</th>
+                  <th class="fw-semibold">Sub-strand</th>
+                  <th class="text-center fw-semibold">EE</th>
+                  <th class="text-center fw-semibold">AE</th>
+                  <th class="text-center fw-semibold">ME</th>
+                  <th class="text-center fw-semibold">BE</th>
+                  <th class="fw-semibold">Reflection</th>
                 </tr>
-              <% }) %>
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                <% examSubjects.forEach(subject => { %>
+                  <tr class="subject-row" data-subject="<%= subject.key %>">
+                    <td class="fw-semibold align-top">
+                      <span><%= subject.label %></span>
+                      <input type="hidden" name="selected_subjects[]" value="<%= subject.key %>">
+                      <!-- keep existing score inputs as hidden to preserve backend behavior -->
+                      <input type="hidden" name="<%= subject.key %>_cat1">
+                      <input type="hidden" name="<%= subject.key %>_cat2">
+                      <input type="hidden" name="<%= subject.key %>_main">
+                    </td>
+                    <td class="align-top">
+                      <div class="input-group input-group-sm mb-2">
+                        <input type="text" name="<%= subject.key %>_strand" class="form-control strand-input" data-subject="<%= subject.key %>" placeholder="e.g. Communication" autocomplete="off">
+                      </div>
+                      <div class="strand-list list-group list-group-flush" data-subject="<%= subject.key %>" data-strand-index="0"></div>
+                    </td>
+                    <td class="align-top">
+                      <div class="substrand-editor" data-subject="<%= subject.key %>">
+                        <div class="input-group input-group-sm mb-2">
+                          <input type="text" class="form-control substrand-input" data-subject="<%= subject.key %>" placeholder="Type a sub-strand and press Enter" autocomplete="off">
+                        </div>
+                        <div class="substrand-list list-group list-group-flush" data-subject="<%= subject.key %>" data-substrand-index="0"></div>
+                      </div>
+                    </td>
+                    <td class="align-top text-center">
+                      <div class="substrand-checklist" data-subject="<%= subject.key %>" data-type="ee"></div>
+                    </td>
+                    <td class="align-top text-center">
+                      <div class="substrand-checklist" data-subject="<%= subject.key %>" data-type="ae"></div>
+                    </td>
+                    <td class="align-top text-center">
+                      <div class="substrand-checklist" data-subject="<%= subject.key %>" data-type="me"></div>
+                    </td>
+                    <td class="align-top text-center">
+                      <div class="substrand-checklist" data-subject="<%= subject.key %>" data-type="be"></div>
+                    </td>
+                    <td class="align-top">
+                      <div class="substrand-reflection-list" data-subject="<%= subject.key %>"></div>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          <% } else { %>
+            <table class="table table-bordered mb-0 align-middle">
+              <thead class="table-secondary">
+                <tr>
+                  <th class="fw-semibold">Learning Area</th>
+                  <th class="text-center fw-semibold">CAT1</th>
+                  <th class="text-center fw-semibold">CAT2</th>
+                  <th class="text-center fw-semibold">Main</th>
+                  <th class="text-center fw-semibold">Final</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% examSubjects.forEach(subject => { %>
+                  <tr class="subject-row" data-subject="<%= subject.key %>">
+                    <td class="fw-semibold">
+                      <span><%= subject.label %></span>
+                    </td>
+                    <td class="text-center"><input type="number" name="<%= subject.key %>_cat1" class="form-control form-control-sm occasion-input text-center" min="0" max="100" step="1"></td>
+                    <td class="text-center"><input type="number" name="<%= subject.key %>_cat2" class="form-control form-control-sm occasion-input text-center" min="0" max="100" step="1"></td>
+                    <td class="text-center"><input type="number" name="<%= subject.key %>_main" class="form-control form-control-sm occasion-input text-center" min="0" max="100" step="1"></td>
+                    <td class="text-center"><input type="text" class="form-control form-control-sm final-mark text-center" data-subject="<%= subject.key %>" readonly></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          <% } %>
         </div>
 
         <div class="row align-items-center mt-4">
@@ -102,7 +164,10 @@
             </div>
           </div>
           <div class="col-12 col-md-4 text-md-end mt-3 mt-md-0">
-            <button type="submit" class="btn btn-primary px-4 w-100 w-md-auto">Save Result</button>
+            <div class="d-flex justify-content-end gap-2">
+              <button type="button" id="clearAllBtn" class="btn btn-outline-danger px-4">Clear All Fields</button>
+              <button type="submit" class="btn btn-primary px-4 w-100 w-md-auto">Save Result</button>
+            </div>
           </div>
         </div>
       </form>
@@ -123,6 +188,7 @@
         const examSubjects = <%- JSON.stringify(examSubjectsData) %>;
         const gradeValue = "<%= grade || '' %>";
         const selectedTermValue = "<%= selectedTerm %>";
+        const assessmentTypeValue = "<%= assessmentType || 'continous' %>";
         const learnerSelect = document.querySelector('[name="learner_id"]');
         const gradeSelect = document.getElementById('gradeSelect');
         const gradeInput = document.querySelector('input[name="grade"]');
@@ -254,14 +320,151 @@
 
         const getStateKey = (learnerId = null) => {
           const id = learnerId !== null ? learnerId : (learnerSelect ? learnerSelect.value || 'none' : 'none');
-          return `exam_add_${gradeValue}_${selectedTermValue}_${id}`;
+          return `exam_add_${gradeValue}_${selectedTermValue}_${assessmentTypeValue}_${id}`;
+        };
+
+        const collectDynamicEntryState = () => {
+          const dynamicEntries = {};
+          examSubjects.forEach(subject => {
+            const subjectKey = subject.key;
+            const strandList = document.querySelector(`.strand-list[data-subject="${subjectKey}"]`);
+            const subList = document.querySelector(`.substrand-list[data-subject="${subjectKey}"]`);
+            const draftStrandInput = document.querySelector(`input[name="${subjectKey}_strand"]`);
+            const draftSubstrandInput = document.querySelector(`.substrand-input[data-subject="${subjectKey}"]`);
+            dynamicEntries[subjectKey] = {
+              drafts: {
+                strand: draftStrandInput ? draftStrandInput.value : '',
+                substrand: draftSubstrandInput ? draftSubstrandInput.value : ''
+              },
+              strands: strandList
+                ? Array.from(strandList.querySelectorAll('.strand-item input[type="hidden"][name="' + subjectKey + '_strand[]"]')).map(input => input.value)
+                : [],
+              substrands: subList
+                ? Array.from(subList.querySelectorAll('.substrand-item')).map((item, idx) => {
+                    const entryId = item.dataset.entryId || `${subjectKey}_line_${idx + 1}`;
+                    const hiddenInput = item.querySelector('input[type="hidden"]');
+                    return {
+                      text: hiddenInput ? hiddenInput.value : '',
+                      ee: document.querySelector(`input[name="${entryId}_ee"]`)?.checked || false,
+                      ae: document.querySelector(`input[name="${entryId}_ae"]`)?.checked || false,
+                      me: document.querySelector(`input[name="${entryId}_me"]`)?.checked || false,
+                      be: document.querySelector(`input[name="${entryId}_be"]`)?.checked || false,
+                      reflection: document.querySelector(`textarea[name="${entryId}_reflection"]`)?.value || '',
+                      parentStrandIndex: item.dataset.parentStrandIndex || null
+                    };
+                  })
+                : []
+            };
+          });
+          return dynamicEntries;
+        };
+
+        const restoreDynamicEntryState = (dynamicEntries = {}) => {
+          examSubjects.forEach(subject => {
+            const subjectKey = subject.key;
+            const strandList = document.querySelector(`.strand-list[data-subject="${subjectKey}"]`);
+            const subList = document.querySelector(`.substrand-list[data-subject="${subjectKey}"]`);
+            const reflectionList = document.querySelector(`.substrand-reflection-list[data-subject="${subjectKey}"]`);
+            const checklistContainers = ['ee','ae','me','be'].map(type => document.querySelector(`.substrand-checklist[data-subject="${subjectKey}"][data-type="${type}"]`));
+
+            if (!strandList || !subList) return;
+
+            strandList.innerHTML = '';
+            subList.innerHTML = '';
+            checklistContainers.forEach(container => {
+              if (container) container.innerHTML = '';
+            });
+            if (reflectionList) reflectionList.innerHTML = '';
+
+            const savedEntrySet = dynamicEntries[subjectKey] || {};
+            const savedStrands = Array.isArray(savedEntrySet.strands) ? savedEntrySet.strands : [];
+            const savedSubstrands = Array.isArray(savedEntrySet.substrands) ? savedEntrySet.substrands : [];
+
+            strandList.dataset.strandIndex = String(savedStrands.length);
+            savedStrands.forEach((value, index) => {
+              const item = document.createElement('div');
+              item.className = 'strand-item border rounded';
+              item.dataset.entryId = `${subjectKey}_strand_${index + 1}`;
+              item.innerHTML = `<div class="entry-text small fw-semibold">${toRoman(index + 1)}. ${escapeHtml(value)}</div>`;
+              const hidden = document.createElement('input');
+              hidden.type = 'hidden';
+              hidden.name = `${subjectKey}_strand[]`;
+              hidden.value = value;
+              item.appendChild(hidden);
+              strandList.appendChild(item);
+              bindEditAction(item, { subjectKey, kind: 'strand', entryId: item.dataset.entryId, label: toRoman(index + 1) });
+            });
+
+            subList.dataset.substrandIndex = String(savedSubstrands.length);
+            const draftStrandInput = document.querySelector(`input[name="${subjectKey}_strand"]`);
+            const draftSubstrandInput = document.querySelector(`.substrand-input[data-subject="${subjectKey}"]`);
+            if (draftStrandInput && typeof savedEntrySet.drafts?.strand === 'string') {
+              draftStrandInput.value = savedEntrySet.drafts.strand;
+            }
+            if (draftSubstrandInput && typeof savedEntrySet.drafts?.substrand === 'string') {
+              draftSubstrandInput.value = savedEntrySet.drafts.substrand;
+            }
+            savedSubstrands.forEach((entry, index) => {
+              const item = document.createElement('div');
+              const entryId = `${subjectKey}_line_${index + 1}`;
+              item.className = 'substrand-item border rounded';
+              item.dataset.entryId = entryId;
+              item.innerHTML = `<div class="entry-text small fw-semibold">${toRoman(index + 1)}. ${escapeHtml(entry.text || '')}</div>`;
+              const hidden = document.createElement('input');
+              hidden.type = 'hidden';
+              hidden.name = `${entryId}_text`;
+              hidden.value = entry.text || '';
+              item.appendChild(hidden);
+              subList.appendChild(item);
+              bindEditAction(item, { subjectKey, kind: 'substrand', entryId, label: toRoman(index + 1) });
+
+              // attempt to preserve or assign a parent strand color
+              const strandList = document.querySelector(`.strand-list[data-subject="${subjectKey}"]`);
+              const strandCount = strandList ? strandList.querySelectorAll('.strand-item').length : 0;
+              const parentIndex = (entry.parentStrandIndex && Number(entry.parentStrandIndex)) || (strandCount > 0 ? strandCount : (index + 1));
+              const colorIndex = ((parentIndex - 1) % 2) + 1;
+              item.dataset.parentStrandIndex = String(parentIndex);
+              item.classList.add(`strand-color-${colorIndex}`);
+
+              ['ee','ae','me','be'].forEach(type => {
+                const container = document.querySelector(`.substrand-checklist[data-subject="${subjectKey}"][data-type="${type}"]`);
+                if (!container) return;
+                const wrap = document.createElement('div');
+                wrap.className = 'substrand-cell border rounded mb-2';
+                wrap.dataset.entryId = entryId;
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.name = `${entryId}_${type}`;
+                cb.value = '1';
+                cb.checked = !!(entry && entry[type]);
+                wrap.appendChild(cb);
+                container.appendChild(wrap);
+              });
+
+              if (reflectionList) {
+                const wrap = document.createElement('div');
+                wrap.className = 'reflection-cell border rounded mb-2';
+                wrap.dataset.entryId = entryId;
+                const ta = document.createElement('textarea');
+                ta.className = 'substrand-reflection-input';
+                ta.name = `${entryId}_reflection`;
+                ta.rows = 1;
+                ta.placeholder = 'Reflection';
+                ta.value = entry.reflection || '';
+                wrap.appendChild(ta);
+                reflectionList.appendChild(wrap);
+              }
+            });
+            syncSubstrandEntryHeights(subjectKey);
+          });
         };
 
         const saveFormState = () => {
           const state = {
             learner_id: learnerSelect ? learnerSelect.value : null,
             activeSubjects: activeSubjectKeys(),
-            values: {}
+            values: {},
+            dynamicEntries: collectDynamicEntryState()
           };
           subjectKeys().forEach(subject => {
             state.values[`${subject}_cat1`] = document.querySelector(`input[name="${subject}_cat1"]`)?.value || '';
@@ -274,7 +477,7 @@
         const findSavedState = () => {
           const exact = localStorage.getItem(getStateKey());
           if (exact) return exact;
-          const prefix = `exam_add_${gradeValue}_${selectedTermValue}_`;
+          const prefix = `exam_add_${gradeValue}_${selectedTermValue}_${assessmentTypeValue}_`;
           for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
             if (typeof key === 'string' && key.startsWith(prefix)) {
@@ -313,6 +516,7 @@
               cat2.value = (state.values && state.values[`${subject}_cat2`]) || '';
               main.value = (state.values && state.values[`${subject}_main`]) || '';
             });
+            restoreDynamicEntryState(state.dynamicEntries || {});
             updateFinal();
             updateSubjectState();
             return true;
@@ -344,16 +548,62 @@
             if (!cat1 || !cat2 || !main || !row) return;
             if (learner) {
               const saved = learner.subjectRows && learner.subjectRows[subject];
-              if (saved) {
-                cat1.value = saved.cat1 ?? '';
-                cat2.value = saved.cat2 ?? '';
-                main.value = saved.main ?? '';
-              } else {
-                cat1.value = learner[`${subject}_cat1`] ?? '';
-                cat2.value = learner[`${subject}_cat2`] ?? '';
-                main.value = learner[`${subject}_main`] ?? '';
+              const savedCat1 = saved?.cat1 ?? learner[`${subject}_cat1`] ?? '';
+              const savedCat2 = saved?.cat2 ?? learner[`${subject}_cat2`] ?? '';
+              const savedMain = saved?.main ?? learner[`${subject}_main`] ?? '';
+              cat1.value = savedCat1;
+              cat2.value = savedCat2;
+              main.value = savedMain;
+
+              const hasContinuousData = !!(saved && (saved.strand || saved.sub_strand || saved.reflection || saved.ee || saved.ae || saved.me || saved.be));
+              if (hasContinuousData) {
+                // Build a dynamicEntries structure and reuse restoreDynamicEntryState
+                const dynamicEntries = {};
+                dynamicEntries[subject] = {
+                  drafts: {
+                    strand: '',
+                    substrand: ''
+                  },
+                  strands: saved.strand ? [saved.strand] : [],
+                  substrands: []
+                };
+
+                // split multi-line substrand/reflection into multiple entries
+                const substrandLines = saved.sub_strand ? String(saved.sub_strand).split('\n').map(s => s.trim()).filter(s => s !== '') : [];
+                const reflectionLines = saved.reflection ? String(saved.reflection).split('\n').map(s => s.trim()) : [];
+                if (substrandLines.length > 0) {
+                  substrandLines.forEach((text, idx) => {
+                    dynamicEntries[subject].substrands.push({
+                      text,
+                      ee: !!saved.ee,
+                      ae: !!saved.ae,
+                      me: !!saved.me,
+                      be: !!saved.be,
+                      reflection: reflectionLines[idx] || '',
+                      parentStrandIndex: saved.strand ? 1 : null
+                    });
+                  });
+                } else if (saved.sub_strand || saved.reflection || saved.ee || saved.ae || saved.me || saved.be) {
+                  // single fallback entry
+                  dynamicEntries[subject].substrands.push({
+                    text: saved.sub_strand || '',
+                    ee: !!saved.ee,
+                    ae: !!saved.ae,
+                    me: !!saved.me,
+                    be: !!saved.be,
+                    reflection: saved.reflection || '',
+                    parentStrandIndex: saved.strand ? 1 : null
+                  });
+                }
+
+                try {
+                  restoreDynamicEntryState(dynamicEntries);
+                } catch (e) {
+                  console.warn('Could not restore dynamic continuous entries for', subject, e);
+                }
               }
-              if (cat1.value || cat2.value || main.value) {
+
+              if (saved || cat1.value || cat2.value || main.value) {
                 setRowState(row, true);
               }
             } else {
@@ -380,7 +630,18 @@
 
         if (learnerSelect) {
           learnerSelect.addEventListener('change', event => {
-            populateLearnerScores(event.target.value);
+            const learnerId = event.target.value;
+            const params = new URLSearchParams(window.location.search);
+            if (learnerId) {
+              params.set('learner_id', learnerId);
+            } else {
+              params.delete('learner_id');
+            }
+            params.set('grade', gradeSelect?.value || gradeValue || '');
+            params.set('term', selectedTermValue);
+            params.set('assessment', assessmentTypeValue);
+            history.replaceState(null, '', `${window.location.pathname}?${params.toString()}`);
+            populateLearnerScores(learnerId);
           });
         }
 
@@ -399,13 +660,444 @@
           button.addEventListener('click', () => removeSubjectRow(button.dataset.subject));
         });
 
+
+        // Sub-strand editor: add entries with Roman numbering and wire checkboxes/reflections
+        const toRoman = num => {
+          if (!Number.isInteger(num) || num <= 0) return String(num);
+          const vals = [1000,900,500,400,100,90,50,40,10,9,5,4,1];
+          const syms = ['M','CM','D','CD','C','XC','L','XL','X','IX','V','IV','I'];
+          let res = '';
+          for (let i=0;i<vals.length;i++){
+            while (num>=vals[i]){ res += syms[i]; num -= vals[i]; }
+          }
+          return res.toLowerCase();
+        };
+
+        const escapeHtml = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+        const renumberStrandEntries = subjectKey => {
+          const list = document.querySelector(`.strand-list[data-subject="${subjectKey}"]`);
+          if (!list) return;
+          const items = Array.from(list.querySelectorAll('.strand-item'));
+          items.forEach((item, index) => {
+            const label = toRoman(index + 1);
+            const hidden = item.querySelector('input[type="hidden"]');
+            const textNode = item.querySelector('.entry-text');
+            const value = hidden ? hidden.value : '';
+            item.dataset.entryId = `${subjectKey}_strand_${index + 1}`;
+            item.dataset.label = label;
+            // apply a persistent color class based on strand order (1-2 cycle)
+            const colorIndex = ((index) % 2) + 1;
+            item.dataset.strandIndex = String(index + 1);
+            item.classList.remove(...Array.from(item.classList).filter(c => c.startsWith('strand-color-')));
+            item.classList.add(`strand-color-${colorIndex}`);
+            if (hidden) hidden.name = `${subjectKey}_strand[]`;
+            if (textNode) textNode.innerHTML = `${label}. ${escapeHtml(value)}`;
+          });
+          list.dataset.strandIndex = String(items.length);
+        };
+
+        const renumberSubstrandEntries = subjectKey => {
+          const list = document.querySelector(`.substrand-list[data-subject="${subjectKey}"]`);
+          if (!list) return;
+          const items = Array.from(list.querySelectorAll('.substrand-item'));
+          const oldIds = items.map(item => item.dataset.entryId || '');
+          items.forEach((item, index) => {
+            const label = toRoman(index + 1);
+            const newEntryId = `${subjectKey}_line_${index + 1}`;
+            const hidden = item.querySelector('input[type="hidden"]');
+            const textNode = item.querySelector('.entry-text');
+            const value = hidden ? hidden.value : '';
+            item.dataset.entryId = newEntryId;
+            item.dataset.label = label;
+            // determine color from explicit parentStrandIndex if present (1-2 cycle)
+            const parentIndexRaw = item.dataset.parentStrandIndex;
+            const parentIndex = parentIndexRaw ? Number(parentIndexRaw) : null;
+            const colorIndex = parentIndex ? (((parentIndex - 1) % 2) + 1) : (((index) % 2) + 1);
+            // normalize classes
+            item.classList.remove(...Array.from(item.classList).filter(c => c.startsWith('strand-color-')));
+            item.classList.add(`strand-color-${colorIndex}`);
+            if (hidden) hidden.name = `${newEntryId}_text`;
+            if (textNode) textNode.innerHTML = `${label}. ${escapeHtml(value)}`;
+          });
+
+          oldIds.forEach((oldId, index) => {
+            if (!oldId) return;
+            const newEntryId = `${subjectKey}_line_${index + 1}`;
+            document.querySelectorAll(`.substrand-checklist[data-subject="${subjectKey}"] .substrand-cell[data-entry-id="${oldId}"]`).forEach(cell => {
+              const checkbox = cell.querySelector('input[type="checkbox"]');
+              cell.dataset.entryId = newEntryId;
+              const checklistType = cell.closest('.substrand-checklist')?.dataset.type || 'ee';
+              if (checkbox) checkbox.name = `${newEntryId}_${checklistType}`;
+            });
+            document.querySelectorAll(`.substrand-reflection-list[data-subject="${subjectKey}"] .reflection-cell[data-entry-id="${oldId}"]`).forEach(cell => {
+              cell.dataset.entryId = newEntryId;
+              const textarea = cell.querySelector('textarea');
+              if (textarea) textarea.name = `${newEntryId}_reflection`;
+            });
+          });
+
+          list.dataset.substrandIndex = String(items.length);
+        };
+
+        // const clearStrandEntries = subjectKey => {
+        //   const list = document.querySelector(`.strand-list[data-subject="${subjectKey}"]`);
+        //   const input = document.querySelector(`input[name="${subjectKey}_strand"]`);
+        //   if (list) {
+        //     list.innerHTML = '';
+        //     list.dataset.strandIndex = '0';
+        //   }
+        //   if (input) input.value = '';
+        //   saveFormState();
+        // };
+
+        // const clearSubstrandEntries = subjectKey => {
+        //   const list = document.querySelector(`.substrand-list[data-subject="${subjectKey}"]`);
+        //   const reflectionList = document.querySelector(`.substrand-reflection-list[data-subject="${subjectKey}"]`);
+        //   const input = document.querySelector(`.substrand-input[data-subject="${subjectKey}"]`);
+        //   ['ee','ae','me','be'].forEach(type => {
+        //     const container = document.querySelector(`.substrand-checklist[data-subject="${subjectKey}"][data-type="${type}"]`);
+        //     if (container) container.innerHTML = '';
+        //   });
+        //   if (list) {
+        //     list.innerHTML = '';
+        //     list.dataset.substrandIndex = '0';
+        //   }
+        //   if (reflectionList) reflectionList.innerHTML = '';
+        //   if (input) input.value = '';
+        //   saveFormState();
+        // };
+
+        const deleteStrandEntry = (subjectKey, item) => {
+          const list = document.querySelector(`.strand-list[data-subject="${subjectKey}"]`);
+          if (!list || !item) return;
+          // determine which strand index is being removed
+          const removedIndex = Number(item.dataset.strandIndex || (String(item.dataset.entryId || '').split('_').pop())) || null;
+          item.remove();
+          // renumber remaining strands
+          renumberStrandEntries(subjectKey);
+
+          // adjust parentStrandIndex on substrand items so color binding persists
+          const substrands = Array.from(document.querySelectorAll(`.substrand-list[data-subject="${subjectKey}"] .substrand-item`));
+          const strands = Array.from(document.querySelectorAll(`.strand-list[data-subject="${subjectKey}"] .strand-item`));
+          const strandCount = strands.length;
+          substrands.forEach(s => {
+            const p = s.dataset.parentStrandIndex ? Number(s.dataset.parentStrandIndex) : null;
+            if (!p || removedIndex === null) return;
+            if (p === removedIndex) {
+              // reassign to previous strand if exists, else to first available, else remove binding
+              if (strandCount >= removedIndex) {
+                s.dataset.parentStrandIndex = String(removedIndex);
+              } else if (strandCount > 0) {
+                s.dataset.parentStrandIndex = String(Math.max(1, removedIndex - 1));
+              } else {
+                delete s.dataset.parentStrandIndex;
+              }
+            } else if (p > removedIndex) {
+              s.dataset.parentStrandIndex = String(p - 1);
+            }
+          });
+
+          renumberSubstrandEntries(subjectKey);
+          saveFormState();
+        };
+
+        const deleteSubstrandEntry = (subjectKey, item) => {
+          const list = document.querySelector(`.substrand-list[data-subject="${subjectKey}"]`);
+          if (!list || !item) return;
+          const entryId = item.dataset.entryId;
+          item.remove();
+          document.querySelectorAll(`.substrand-checklist[data-subject="${subjectKey}"] .substrand-cell[data-entry-id="${entryId}"]`).forEach(cell => cell.remove());
+          document.querySelectorAll(`.substrand-reflection-list[data-subject="${subjectKey}"] .reflection-cell[data-entry-id="${entryId}"]`).forEach(cell => cell.remove());
+          renumberSubstrandEntries(subjectKey);
+          syncSubstrandEntryHeights(subjectKey);
+          saveFormState();
+        };
+
+        const bindEditAction = (item, { subjectKey, kind, entryId, label }) => {
+          const textNode = item.querySelector('.entry-text');
+          if (!textNode || textNode.dataset.editBound === 'true') return;
+          textNode.dataset.editBound = 'true';
+          textNode.tabIndex = 0;
+          textNode.style.cursor = 'pointer';
+
+          textNode.addEventListener('click', event => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const currentValue = item.querySelector('input[type="hidden"]')?.value || '';
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'form-control form-control-sm inline-entry-edit';
+            input.value = currentValue;
+            input.setAttribute('aria-label', `Edit ${kind} value`);
+
+            const parent = textNode.parentNode;
+            if (parent) {
+              parent.replaceChild(input, textNode);
+            }
+            input.focus();
+            input.select();
+
+            const commitEdit = () => {
+              const nextValue = String(input.value || '').trim();
+              const finalValue = nextValue || currentValue;
+              const hidden = item.querySelector('input[type="hidden"]');
+              if (hidden) hidden.value = finalValue;
+
+              const currentLabel = item.dataset.label || label;
+              const newText = document.createElement('div');
+              newText.className = 'entry-text small fw-semibold';
+              newText.innerHTML = `${currentLabel}. ${escapeHtml(finalValue)}`;
+              newText.tabIndex = 0;
+              newText.style.cursor = 'pointer';
+              parent.replaceChild(newText, input);
+              bindEditAction(item, { subjectKey, kind, entryId, label: currentLabel });
+              saveFormState();
+            };
+
+            input.addEventListener('keydown', event => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                commitEdit();
+              }
+              if (event.key === 'Escape') {
+                event.preventDefault();
+                input.value = currentValue;
+                commitEdit();
+              }
+            });
+
+            input.addEventListener('blur', commitEdit);
+          });
+        };
+
+        const addStrandEntry = (subjectKey, value, sourceInput) => {
+          const strandList = document.querySelector(`.strand-list[data-subject="${subjectKey}"]`);
+          const subList = document.querySelector(`.substrand-list[data-subject="${subjectKey}"]`);
+          if (!strandList) return;
+
+          if (subList) {
+            subList.dataset.substrandIndex = '0';
+          }
+
+          const index = Number(strandList.dataset.strandIndex || '0') + 1;
+          strandList.dataset.strandIndex = String(index);
+          const label = toRoman(index);
+          const safe = escapeHtml(value);
+          const item = document.createElement('div');
+          item.className = 'strand-item border rounded';
+          item.dataset.entryId = `${subjectKey}_strand_${index}`;
+          item.dataset.label = label;
+          // color class for this strand (1-2 cycle)
+          const colorIndex = ((index - 1) % 2) + 1;
+          item.dataset.strandIndex = String(index);
+          item.classList.add(`strand-color-${colorIndex}`);
+          item.innerHTML = `<div class="entry-text small fw-semibold">${label}. ${safe}</div>`;
+          const hidden = document.createElement('input');
+          hidden.type = 'hidden';
+          hidden.name = `${subjectKey}_strand[]`;
+          hidden.value = value;
+          item.appendChild(hidden);
+
+          const deleteButton = document.createElement('button');
+          deleteButton.type = 'button';
+          deleteButton.className = 'entry-delete-btn';
+          deleteButton.title = 'Delete strand';
+          deleteButton.innerHTML = '&times;';
+          deleteButton.addEventListener('click', event => {
+            event.stopPropagation();
+            deleteStrandEntry(subjectKey, item);
+          });
+          const actions = document.createElement('div');
+          actions.className = 'entry-actions';
+          actions.appendChild(deleteButton);
+          item.appendChild(actions);
+
+          strandList.appendChild(item);
+          bindEditAction(item, { subjectKey, kind: 'strand', entryId: item.dataset.entryId, label });
+          saveFormState();
+          if (sourceInput) sourceInput.value = '';
+        };
+
+        const addSubstrandEntry = (subjectKey, value, sourceInput) => {
+          const list = document.querySelector(`.substrand-list[data-subject="${subjectKey}"]`);
+          if (!list) return;
+          const index = Number(list.dataset.substrandIndex || '0') + 1;
+          list.dataset.substrandIndex = String(index);
+          const label = toRoman(index);
+          const safe = escapeHtml(value);
+          const entryId = `${subjectKey}_line_${index}`;
+
+          const item = document.createElement('div');
+          item.className = 'substrand-item border rounded';
+          item.dataset.entryId = entryId;
+          item.dataset.label = label;
+          item.innerHTML = `<div class="entry-text small fw-semibold">${label}. ${safe}</div>`;
+          const hidden = document.createElement('input');
+          hidden.type = 'hidden';
+          hidden.name = `${entryId}_text`;
+          hidden.value = value;
+          item.appendChild(hidden);
+
+          const deleteButton = document.createElement('button');
+          deleteButton.type = 'button';
+          deleteButton.className = 'entry-delete-btn';
+          deleteButton.title = 'Delete sub-strand';
+          deleteButton.innerHTML = '&times;';
+          deleteButton.addEventListener('click', event => {
+            event.stopPropagation();
+            deleteSubstrandEntry(subjectKey, item);
+          });
+          const actions = document.createElement('div');
+          actions.className = 'entry-actions';
+          actions.appendChild(deleteButton);
+          item.appendChild(actions);
+
+          list.appendChild(item);
+          bindEditAction(item, { subjectKey, kind: 'substrand', entryId, label });
+
+          // bind this substrand to the most recent strand's color (if any)
+          const strandList = document.querySelector(`.strand-list[data-subject="${subjectKey}"]`);
+          const strandCount = strandList ? strandList.querySelectorAll('.strand-item').length : 0;
+          const parentIndex = strandCount > 0 ? strandCount : 1;
+          const colorIndex = ((parentIndex - 1) % 2) + 1;
+          item.dataset.parentStrandIndex = String(parentIndex);
+          item.classList.add(`strand-color-${colorIndex}`);
+
+          ['ee','ae','me','be'].forEach(type => {
+            const container = document.querySelector(`.substrand-checklist[data-subject="${subjectKey}"][data-type="${type}"]`);
+            if (!container) return;
+            const wrap = document.createElement('div');
+            wrap.className = 'substrand-cell border rounded mb-2';
+            wrap.dataset.entryId = entryId;
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.name = `${entryId}_${type}`;
+            cb.value = '1';
+            wrap.appendChild(cb);
+            container.appendChild(wrap);
+          });
+
+          const reflContainer = document.querySelector(`.substrand-reflection-list[data-subject="${subjectKey}"]`);
+          if (reflContainer) {
+            const wrap = document.createElement('div');
+            wrap.className = 'reflection-cell border rounded mb-2';
+            wrap.dataset.entryId = entryId;
+            const ta = document.createElement('textarea');
+            ta.className = 'substrand-reflection-input';
+            ta.name = `${entryId}_reflection`;
+            ta.rows = 1;
+            ta.placeholder = 'Reflection';
+            wrap.appendChild(ta);
+            reflContainer.appendChild(wrap);
+          }
+
+          syncSubstrandEntryHeights(subjectKey);
+          saveFormState();
+          if (sourceInput) sourceInput.value = '';
+        };
+
+        const syncSubstrandEntryHeights = subjectKey => {
+          const subList = document.querySelector(`.substrand-list[data-subject="${subjectKey}"]`);
+          if (!subList) return;
+
+          const items = Array.from(subList.querySelectorAll('.substrand-item'));
+          items.forEach(item => {
+            const entryId = item.dataset.entryId;
+            if (!entryId) return;
+
+            const cells = [
+              ...document.querySelectorAll(`.substrand-checklist[data-subject="${subjectKey}"] .substrand-cell[data-entry-id="${entryId}"]`),
+              ...document.querySelectorAll(`.substrand-reflection-list[data-subject="${subjectKey}"] .reflection-cell[data-entry-id="${entryId}"]`)
+            ];
+            if (!cells.length) return;
+
+            [item, ...cells].forEach(el => {
+              if (el) el.style.height = 'auto';
+            });
+
+            const maxHeight = Math.max(item.offsetHeight, ...cells.map(el => el.offsetHeight));
+            const targetHeight = `${maxHeight}px`;
+            item.style.height = targetHeight;
+            cells.forEach(el => { el.style.height = targetHeight; });
+          });
+        };
+
+        const initStrandEditors = () => {
+          const editors = document.querySelectorAll('input[name$="_strand"]');
+          editors.forEach(input => {
+            if (input._strandInit) return; input._strandInit = true;
+            input.addEventListener('keydown', event => {
+              const isEnterKey = event.key === 'Enter' || event.keyCode === 13;
+              if (!isEnterKey) return;
+              event.preventDefault();
+              const subjectKey = input.dataset.subject || String(input.name || '').replace(/_strand$/, '');
+              const value = String(input.value || '').trim();
+              if (!value) return;
+              addStrandEntry(subjectKey, value, input);
+            });
+          });
+        };
+
+        const initSubstrandEditors = () => {
+          const editors = document.querySelectorAll('.substrand-input');
+          editors.forEach(input => {
+            if (input._substrandInit) return; input._substrandInit = true;
+            input.addEventListener('keydown', event => {
+              const isEnterKey = event.key === 'Enter' || event.keyCode === 13;
+              if (!isEnterKey) return;
+              event.preventDefault();
+              const subjectKey = input.dataset.subject || String(input.name || '').replace(/_strand$/, '');
+              const value = String(input.value || '').trim();
+              if (!value) return;
+              addSubstrandEntry(subjectKey, value, input);
+            });
+          });
+        };
+
+        const updateSubstrandSpacers = () => {
+          document.querySelectorAll('.substrand-spacer').forEach(spacer => spacer.remove());
+          document.querySelectorAll('.substrand-checklist, .substrand-reflection-list').forEach(container => {
+            container.style.marginTop = '0';
+            container.style.paddingTop = '0';
+            container.style.alignItems = 'stretch';
+          });
+        };
+
+        // initialize editors now and whenever subjects change
+        initStrandEditors();
+        initSubstrandEditors();
+        updateSubstrandSpacers();
+        window.addEventListener('resize', () => {
+          updateSubstrandSpacers();
+          examSubjects.forEach(subject => syncSubstrandEntryHeights(subject.key));
+        });
+
         initializeSubjectRows();
 
         document.addEventListener('input', event => {
-          if (!event.target.matches('.occasion-input')) return;
-          clampMarkInput(event.target);
-          updateFinal();
+          if (!event.target.matches('.occasion-input, .strand-input, .substrand-input, .substrand-reflection-input, input[name$="_cat1"], input[name$="_cat2"], input[name$="_main"]')) return;
+          if (event.target.matches('.occasion-input')) {
+            clampMarkInput(event.target);
+            updateFinal();
+          }
           saveFormState();
+        });
+
+        let skipSaveOnUnload = false;
+        const examForm = document.querySelector('form[action="/exams/add"]');
+        if (examForm) {
+          examForm.addEventListener('submit', () => {
+            skipSaveOnUnload = true;
+            localStorage.removeItem(getStateKey());
+          });
+        }
+
+        window.addEventListener('beforeunload', event => {
+          if (!skipSaveOnUnload) {
+            saveFormState();
+          }
         });
 
         const restored = loadFormState();
@@ -421,6 +1113,66 @@
             }
           }
         }
+
+        const clearAllFields = () => {
+          if (!confirm('Clear all fields? This will reset input, dynamic entries, and saved form state.')) return;
+          const form = document.querySelector('form');
+          if (!form) return;
+
+          form.querySelectorAll('input,textarea,select').forEach(el => {
+            if (el.type === 'checkbox' || el.type === 'radio') {
+              el.checked = false;
+            } else if (el.tagName === 'SELECT') {
+              el.value = '';
+            } else {
+              el.value = '';
+            }
+          });
+
+          examSubjects.forEach(subject => {
+            const row = document.querySelector(`.subject-row[data-subject="${subject.key}"]`);
+            if (row) setRowState(row, false);
+
+            const strandList = document.querySelector(`.strand-list[data-subject="${subject.key}"]`);
+            if (strandList) {
+              strandList.innerHTML = '';
+              strandList.dataset.strandIndex = '0';
+            }
+
+            const subList = document.querySelector(`.substrand-list[data-subject="${subject.key}"]`);
+            if (subList) {
+              subList.innerHTML = '';
+              subList.dataset.substrandIndex = '0';
+            }
+
+            ['ee','ae','me','be'].forEach(type => {
+              const container = document.querySelector(`.substrand-checklist[data-subject="${subject.key}"][data-type="${type}"]`);
+              if (container) container.innerHTML = '';
+            });
+
+            const reflectionList = document.querySelector(`.substrand-reflection-list[data-subject="${subject.key}"]`);
+            if (reflectionList) reflectionList.innerHTML = '';
+          });
+
+          if (selectedSubjectInputs) selectedSubjectInputs.innerHTML = '';
+          if (subjectButtonList) subjectButtonList.innerHTML = '';
+
+          const prefix = `exam_add_${gradeValue}_${selectedTermValue}_${assessmentTypeValue}_`;
+          for (let i = localStorage.length - 1; i >= 0; i--) {
+            const key = localStorage.key(i);
+            if (typeof key === 'string' && key.startsWith(prefix)) {
+              localStorage.removeItem(key);
+            }
+          }
+
+          updateSubjectOptions();
+          updateSubjectState(false);
+          updateFinal();
+          saveFormState();
+        };
+
+        const clearAllBtn = document.getElementById('clearAllBtn');
+        if (clearAllBtn) clearAllBtn.addEventListener('click', clearAllFields);
 
         const form = document.querySelector('form');
         if (form) {

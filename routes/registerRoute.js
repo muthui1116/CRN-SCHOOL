@@ -540,6 +540,28 @@ export default function registerRoutes(app) {
           ],
         );
 
+        const normalizedAssessment = assessment_number ? assessment_number.toString().trim() : null;
+        const normalizedName = name ? name.toString().trim() : null;
+
+        if (assignedRole === 3 || currentUser.role === 3) {
+          const learnerMatch = await db.query(
+            `SELECT id FROM learners WHERE assessment_number = $1 OR assessment_number = $2 OR LOWER(name) = LOWER($3) LIMIT 1`,
+            [normalizedAssessment, currentUser.assessment_number || null, normalizedName || ''],
+          );
+
+          if (learnerMatch.rows[0]?.id) {
+            await db.query(
+              `UPDATE learners SET name = $1, grade = $2, assessment_number = $3 WHERE id = $4`,
+              [normalizedName || null, grade || null, normalizedAssessment || null, learnerMatch.rows[0].id],
+            );
+          } else if (assignedRole === 3 && (normalizedName || normalizedAssessment || grade)) {
+            await db.query(
+              `INSERT INTO learners (name, assessment_number, grade) VALUES ($1, $2, $3)`,
+              [normalizedName || null, normalizedAssessment || null, grade || null],
+            );
+          }
+        }
+
         return res.redirect(getRoleLanding(assignedRole));
       } catch (err) {
         console.error(err);

@@ -5,6 +5,11 @@ dotenv.config();
 
 // Create a pg db using DATABASE_URL
 const db = new pg.Pool({
+  user: process.env.DB_USER,
+  host: process.env.DB_HOST,
+  database: process.env.DB_NAME,
+  password: process.env.DB_PASSWORD,
+  port: process.env.DB_PORT,
   connectionString: process.env.DATABASE_URL,
 });
 
@@ -42,10 +47,30 @@ const connectDatabase = async () => {
         final_mark VARCHAR(50),
         pl VARCHAR(100),
         points VARCHAR(100),
+        ee VARCHAR(10),
+        ae VARCHAR(10),
+        me VARCHAR(10),
+        be VARCHAR(10),
+        strand VARCHAR(255),
+        sub_strand VARCHAR(255),
+        lesson_title VARCHAR(255),
+        reflection TEXT,
         date_created TIMESTAMPTZ NOT NULL DEFAULT now(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
         UNIQUE (learner_id, term, subject_code)
       )
+    `);
+
+    await db.query(`
+      ALTER TABLE learner_result_subjects
+      ADD COLUMN IF NOT EXISTS ee VARCHAR(10),
+      ADD COLUMN IF NOT EXISTS ae VARCHAR(10),
+      ADD COLUMN IF NOT EXISTS me VARCHAR(10),
+      ADD COLUMN IF NOT EXISTS be VARCHAR(10),
+      ADD COLUMN IF NOT EXISTS strand VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS sub_strand VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS lesson_title VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS reflection TEXT
     `);
 
     console.log('Subjects and subject result tables are ready');

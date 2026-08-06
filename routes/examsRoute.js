@@ -215,9 +215,10 @@ export default function registerExamRoutes(app) {
   });
 
   app.get('/exams/add', isAuthenticated, isTeacher, async (req, res) => {
-    const { grade, term, learner_id } = req.query;
+    const { grade, term, learner_id, assessment } = req.query;
     const selectedTerm = ["1", "2", "3"].includes(term) ? term : "1";
     const selectedLearnerId = learner_id || null;
+    const selectedAssessmentType = assessment === 'summative' ? 'summative' : 'continous';
     let result;
     if (grade) {
       const normalizedGrade = grade.toString().trim();
@@ -262,15 +263,28 @@ export default function registerExamRoutes(app) {
     let subjectRowMap = new Map();
     if (learnerIds.length) {
       const subjectResult = await db.query(
-        `SELECT learner_id, subject_code, subject_name, cat1, cat2, main
+        `SELECT learner_id, subject_code, subject_name, cat1, cat2, main,
+                ee, ae, me, be, strand, sub_strand, reflection
          FROM learner_result_subjects
          WHERE term = $1 AND learner_id = ANY($2)`,
         [selectedTerm, learnerIds]
       );
       subjectResult.rows.forEach(row => {
-        const code = normalizeSubjectCode(row.subject_code);
+        const code = normalizeSubjectCode(row.subject_code || row.subject_name || '');
         const existing = subjectRowMap.get(row.learner_id) || {};
-        existing[code] = row;
+        existing[code] = {
+          cat1: row.cat1 || '',
+          cat2: row.cat2 || '',
+          main: row.main || '',
+          ee: row.ee || null,
+          ae: row.ae || null,
+          me: row.me || null,
+          be: row.be || null,
+          strand: row.strand || null,
+          sub_strand: row.sub_strand || null,
+          reflection: row.reflection || null,
+          subject_name: row.subject_name || row.subject_code || ''
+        };
         subjectRowMap.set(row.learner_id, existing);
       });
     }
@@ -279,13 +293,22 @@ export default function registerExamRoutes(app) {
       ...row,
       subjectRows: subjectRowMap.get(row.id) || {}
     }));
-    res.render('addExam.ejs', { grade: grade || null, selectedTerm, learners: learnersWithSubjects, selectedLearnerId, subjectDefinitions: dbSubjectDefinitions });
+    res.render('addExam.ejs', {
+      grade: grade || null,
+      selectedTerm,
+      learners: learnersWithSubjects,
+      selectedLearnerId,
+      subjectDefinitions: dbSubjectDefinitions,
+      assessmentType: selectedAssessmentType,
+    });
   });
 
   app.post('/exams/add', isAuthenticated, isTeacher, async (req, res) => {
-    const { learner_id, term, grade, selected_subjects } = req.body;
+    const { learner_id, term, grade, selected_subjects, assessment_type } = req.body;
     const selectedTerm = ["1", "2", "3"].includes(term) ? term : "1";
     const selectedGrade = grade || null;
+    const assessmentType = assessment_type === 'summative' ? 'summative' : 'continous';
+    const isContinuousAssessment = assessmentType === 'continous';
     const dbSubjects = await getSubjectDefinitionsFromDb();
     const subjectKeys = dbSubjects.map(subject => subject.key);
     const fixedSubjectKeys = examSubjectKeys;
@@ -496,13 +519,41 @@ export default function registerExamRoutes(app) {
         const main = parseRawMark(req.body[`${subject}_main`]);
         const finalMark = convertExamMark(cat1, cat2, main);
         const { pl, points } = getGradeAndPoints(finalMark);
+
+        // presence flags for any substrand entry checkboxes
+        const ee = Object.keys(req.body).some(name => name.startsWith(`${subject}_line_`) && name.endsWith('_ee')) ? '1' : null;
+        const ae = Object.keys(req.body).some(name => name.startsWith(`${subject}_line_`) && name.endsWith('_ae')) ? '1' : null;
+        const me = Object.keys(req.body).some(name => name.startsWith(`${subject}_line_`) && name.endsWith('_me')) ? '1' : null;
+        const be = Object.keys(req.body).some(name => name.startsWith(`${subject}_line_`) && name.endsWith('_be')) ? '1' : null;
+
+        const strand = req.body[`${subject}_strand`] ? String(req.body[`${subject}_strand`]).trim() : null;
+
+        // collect substrand texts saved as <subject>_line_N_text inputs
+        const substrandKeys = Object.keys(req.body).filter(k => k.startsWith(`${subject}_line_`) && k.endsWith('_text'));
+        const substrandValues = substrandKeys.map(k => String(req.body[k] || '').trim()).filter(v => v !== '');
+        const subStrand = substrandValues.length ? substrandValues.join('\n') : (req.body[`${subject}_sub_strand`] ? String(req.body[`${subject}_sub_strand`]).trim() : null);
+        const lessonTitle = substrandValues.length ? substrandValues[0] : (req.body[`${subject}_sub_strand`] ? String(req.body[`${subject}_sub_strand`]).trim() : null);
+
+        // collect reflection texts saved as <subject>_line_N_reflection inputs
+        const reflectionKeys = Object.keys(req.body).filter(k => k.startsWith(`${subject}_line_`) && k.endsWith('_reflection'));
+        const reflectionValues = reflectionKeys.map(k => String(req.body[k] || '').trim()).filter(v => v !== '');
+        let reflection = null;
+        if (reflectionValues.length) {
+          reflection = reflectionValues.join('\n');
+        } else if (req.body[`${subject}_reflection`]) {
+          const raw = req.body[`${subject}_reflection`];
+          if (Array.isArray(raw)) reflection = raw.map(v => String(v || '').trim()).filter(Boolean).join('\n');
+          else reflection = String(raw || '').trim() || null;
+        }
+
         const subjectName = subjectMap.get(subject) || subject;
 
         await db.query(
           `INSERT INTO learner_result_subjects (
             learner_id, term, subject_code, subject_name,
-            cat1, cat2, main, final_mark, pl, points
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            cat1, cat2, main, final_mark, pl, points,
+            ee, ae, me, be, strand, sub_strand, lesson_title, reflection
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
           ON CONFLICT (learner_id, term, subject_code) DO UPDATE SET
             subject_name = EXCLUDED.subject_name,
             cat1 = EXCLUDED.cat1,
@@ -511,9 +562,26 @@ export default function registerExamRoutes(app) {
             final_mark = EXCLUDED.final_mark,
             pl = EXCLUDED.pl,
             points = EXCLUDED.points,
+            ee = EXCLUDED.ee,
+            ae = EXCLUDED.ae,
+            me = EXCLUDED.me,
+            be = EXCLUDED.be,
+            strand = EXCLUDED.strand,
+            sub_strand = EXCLUDED.sub_strand,
+            lesson_title = EXCLUDED.lesson_title,
+            reflection = EXCLUDED.reflection,
             updated_at = NOW()
           `,
-          [learner_id, selectedTerm, subject, subjectName, cat1 !== null ? String(cat1) : null, cat2 !== null ? String(cat2) : null, main !== null ? String(main) : null, finalMark !== null ? String(finalMark) : null, pl, points]
+          [
+            learner_id, selectedTerm, subject, subjectName,
+            cat1 !== null ? String(cat1) : null,
+            cat2 !== null ? String(cat2) : null,
+            main !== null ? String(main) : null,
+            finalMark !== null ? String(finalMark) : null,
+            pl, points,
+            ee, ae, me, be,
+            strand, subStrand, lessonTitle, reflection
+          ]
         );
       }
 
@@ -656,7 +724,7 @@ export default function registerExamRoutes(app) {
 
   // Export exam results
   app.get('/exams/export', isAuthenticated, isTeacher, async (req, res) => {
-    const { grade, term } = req.query;
+    const { grade, term, assessment } = req.query;
     const selectedTerm = ["1", "2", "3"].includes(term) ? term : "1";
 
     if (!grade) {
@@ -664,6 +732,7 @@ export default function registerExamRoutes(app) {
     }
 
     const normalizedGrade = grade.toString().trim();
+    const selectedAssessmentType = assessment === 'summative' ? 'summative' : 'continous';
 
     const activeSubjectsResult = await db.query(
       `SELECT DISTINCT rs.subject_code, rs.subject_name
@@ -681,14 +750,28 @@ export default function registerExamRoutes(app) {
         }))
       : examSubjectDefinitions;
 
-    const result = await db.query(
-      `SELECT lr.id, lr.learner_id, lr.term, lr.evrg, lr.evrg_pl, lr.evrg_points, l.name, l.assessment_number, l.grade AS learner_grade
-       FROM learner_results lr
-       JOIN learners l ON lr.learner_id = l.id
-       WHERE (LOWER(l.grade) = LOWER($1) OR LOWER(l.grade) = LOWER($3)) AND lr.term = $2
-       ORDER BY l.name`,
-      [normalizedGrade, selectedTerm, `Grade ${normalizedGrade}`]
-    );
+    let result;
+    if (selectedAssessmentType === 'continous') {
+      result = await db.query(
+        `SELECT DISTINCT l.id AS learner_id, l.name, l.assessment_number, l.grade AS learner_grade, rs.term
+         FROM learners l
+         JOIN learner_result_subjects rs ON rs.learner_id = l.id
+         WHERE rs.term = $1 AND (LOWER(l.grade) = LOWER($2) OR LOWER(l.grade) = LOWER($3))
+         ORDER BY l.name`,
+        [selectedTerm, normalizedGrade, `Grade ${normalizedGrade}`]
+      );
+    }
+
+    if (!result || result.rows.length === 0) {
+      result = await db.query(
+        `SELECT lr.id, lr.learner_id, lr.term, lr.evrg, lr.evrg_pl, lr.evrg_points, l.name, l.assessment_number, l.grade AS learner_grade
+         FROM learner_results lr
+         JOIN learners l ON lr.learner_id = l.id
+         WHERE (LOWER(l.grade) = LOWER($1) OR LOWER(l.grade) = LOWER($3)) AND lr.term = $2
+         ORDER BY l.name`,
+        [normalizedGrade, selectedTerm, `Grade ${normalizedGrade}`]
+      );
+    }
 
     const learnerIds = result.rows.map(row => row.learner_id).filter(Boolean);
     const learnerSubjectMap = new Map();
@@ -714,20 +797,39 @@ export default function registerExamRoutes(app) {
 
     const subjKeys = subjectDefinitions.map(subject => subject.key);
 
-    const learners = result.rows.map(row => ({
-      ...row,
-      evrg: row.evrg ?? null,
-      subjectRows: learnerSubjectMap.get(row.learner_id) || {}
-    }));
-
-    // sort by evrg desc then name
-    learners.sort((a, b) => {
-      const aEvrg = Number(a.evrg);
-      const bEvrg = Number(b.evrg);
-      if (Number.isFinite(bEvrg) && Number.isFinite(aEvrg) && bEvrg !== aEvrg) {
-        return bEvrg - aEvrg;
+    const learners = result.rows.map(row => {
+      const subjectRows = learnerSubjectMap.get(row.learner_id) || {};
+      let avrg = row.evrg ?? null;
+      if (avrg === null) {
+        let sum = 0;
+        let count = 0;
+        for (const key of subjKeys) {
+          const value = Number(subjectRows[key]?.mark);
+          if (Number.isFinite(value)) {
+            sum += value;
+            count += 1;
+          }
+        }
+        avrg = count > 0 ? Math.round(sum / count) : null;
       }
-      if ((b.evrg || 0) !== (a.evrg || 0)) return (b.evrg || 0) - (a.evrg || 0);
+      const { pl: avrg_pl, points: avrg_points } = avrg !== null ? getGradeAndPoints(avrg) : { pl: null, points: null };
+      return {
+        ...row,
+        avrg,
+        avrg_pl,
+        avrg_points,
+        subjectRows
+      };
+    });
+
+    // sort by average descending then name
+    learners.sort((a, b) => {
+      const aAvg = Number(a.avrg);
+      const bAvg = Number(b.avrg);
+      if (Number.isFinite(aAvg) && Number.isFinite(bAvg) && aAvg !== bAvg) {
+        return bAvg - aAvg;
+      }
+      if ((a.avrg || 0) !== (b.avrg || 0)) return (b.avrg || 0) - (a.avrg || 0);
       return String(a.name || '').localeCompare(String(b.name || ''));
     });
 
@@ -762,7 +864,7 @@ export default function registerExamRoutes(app) {
       'GRD',
       ...subjectDefinitions.flatMap(subject => [getShortSubjectLabel(subject.label), 'PL']),
       'AVRG',
-      'PL',
+      'AVRG_PL',
       'POS'
     ];
 
@@ -774,6 +876,10 @@ export default function registerExamRoutes(app) {
 
     let csv = headers.map(escapeCsv).join(',') + '\n';
 
+    const subjectTotals = subjKeys.reduce((acc, key) => ({ ...acc, [key]: { sum: 0, count: 0 } }), {});
+    let avrgTotal = 0;
+    let avrgCount = 0;
+
     learners.forEach(row => {
       const cols = [];
       cols.push(row.name ?? '');
@@ -781,15 +887,40 @@ export default function registerExamRoutes(app) {
       cols.push(row.learner_grade ?? grade);
       for (const key of subjKeys) {
         const subjectRow = row.subjectRows[key] || {};
+        const mark = subjectRow.mark !== null && subjectRow.mark !== undefined ? Number(subjectRow.mark) : null;
+        if (Number.isFinite(mark)) {
+          subjectTotals[key].sum += mark;
+          subjectTotals[key].count += 1;
+        }
         cols.push(subjectRow.mark ?? '');
         cols.push(subjectRow.pl ?? '');
       }
-      cols.push(row.evrg ?? '');
-      cols.push(row.evrg_pl ?? '');
+      if (Number.isFinite(Number(row.avrg))) {
+        avrgTotal += Number(row.avrg);
+        avrgCount += 1;
+      }
+      cols.push(row.avrg ?? '');
+      cols.push(row.avrg_pl ?? '');
       cols.push(row.pos ?? '');
 
       csv += cols.map(escapeCsv).join(',') + '\n';
     });
+
+    const averageCols = [];
+    averageCols.push('Average');
+    averageCols.push('');
+    averageCols.push('');
+    for (const key of subjKeys) {
+      const avg = subjectTotals[key].count > 0 ? (subjectTotals[key].sum / subjectTotals[key].count) : null;
+      averageCols.push(avg !== null ? Number(avg.toFixed(2)) : '');
+      averageCols.push('');
+    }
+    const overallAvg = avrgCount > 0 ? Number((avrgTotal / avrgCount).toFixed(2)) : '';
+    averageCols.push(overallAvg);
+    averageCols.push('');
+    averageCols.push('');
+
+    csv += averageCols.map(escapeCsv).join(',') + '\n';
 
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="exam-results-grade-${grade}.csv"`);
@@ -1142,9 +1273,10 @@ export default function registerExamRoutes(app) {
 
   // Rubric export - generate learner report forms
   app.get('/exams/rubric', isAuthenticated, isTeacher, async (req, res) => {
-    const { grade, term } = req.query;
+    const { grade, term, assessment } = req.query;
     const selectedTerm = ["1", "2", "3"].includes(term) ? term : "1";
-    const normalizedGrade = grade.toString().trim();
+    const normalizedGrade = grade ? grade.toString().trim() : '';
+    const selectedAssessmentType = assessment === 'summative' ? 'summative' : 'continous';
 
     const activeSubjectsResult = await db.query(
       `SELECT DISTINCT rs.subject_code, rs.subject_name
@@ -1173,15 +1305,29 @@ export default function registerExamRoutes(app) {
           { key: 'creative_arts', label: 'Creative Arts', code: 'ART' }
         ];
 
-    const result = await db.query(
-      `SELECT lr.id, lr.learner_id, lr.evrg, lr.evrg_pl, lr.evrg_points, l.name, l.grade, l.assessment_number, l.birth_certificate, l.class_teacher
-       FROM learner_results lr
-       JOIN learners l ON lr.learner_id = l.id
-       WHERE (LOWER(l.grade) = LOWER($1) OR LOWER(l.grade) = LOWER($3)) AND lr.term = $2
-       ORDER BY l.name`,
-      [normalizedGrade, selectedTerm, `Grade ${normalizedGrade}`]
-    );
-    
+    let result;
+    if (selectedAssessmentType === 'continous') {
+      result = await db.query(
+        `SELECT DISTINCT l.id AS learner_id, l.name, l.grade, l.assessment_number, l.birth_certificate, l.class_teacher
+         FROM learners l
+         JOIN learner_result_subjects rs ON rs.learner_id = l.id
+         WHERE rs.term = $1 AND (LOWER(l.grade) = LOWER($2) OR LOWER(l.grade) = LOWER($3))
+         ORDER BY l.name`,
+        [selectedTerm, normalizedGrade, `Grade ${normalizedGrade}`]
+      );
+    }
+
+    if (!result || result.rows.length === 0) {
+      result = await db.query(
+        `SELECT lr.id, lr.learner_id, lr.evrg, lr.evrg_pl, lr.evrg_points, l.name, l.grade, l.assessment_number, l.birth_certificate, l.class_teacher
+         FROM learner_results lr
+         JOIN learners l ON lr.learner_id = l.id
+         WHERE (LOWER(l.grade) = LOWER($1) OR LOWER(l.grade) = LOWER($3)) AND lr.term = $2
+         ORDER BY l.name`,
+        [normalizedGrade, selectedTerm, `Grade ${normalizedGrade}`]
+      );
+    }
+
     if (result.rows.length === 0) {
       return res.render('error.ejs', { message: `No learners found for Grade ${grade} and Term ${selectedTerm}` });
     }
@@ -1229,6 +1375,10 @@ export default function registerExamRoutes(app) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Exam Rubric - Grade ${grade}</title>
   <style>
+    @page {
+      size: A4 portrait;
+      margin: 12mm;
+    }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; }
     .page-break { page-break-after: always; margin-bottom: 1rem; }
@@ -1236,9 +1386,11 @@ export default function registerExamRoutes(app) {
       background: white;
       padding: 1rem;
       margin: 0 auto 1rem;
-      max-width: 900px;
+      width: calc(210mm - 24mm);
+      max-width: calc(210mm - 24mm);
       box-shadow: 0 1px 4px rgba(0,0,0,0.08);
       border: 1px solid #ddd;
+      page-break-inside: avoid;
     }
     .header {
       text-align: center;
@@ -1390,6 +1542,41 @@ export default function registerExamRoutes(app) {
     .back-button:hover {
       background: #5a6268;
     }
+    .comments-wrap {
+      margin-top: 1rem;
+    }
+    .comments-title {
+      font-weight: 600;
+      margin-bottom: 0.35rem;
+    }
+    .comments-line {
+      display: block;
+      width: 100%;
+      min-height: 1.2rem;
+      border-bottom: 1px dotted #444;
+      margin: 0 0 0.75rem;
+    }
+    .comments-line.short {
+      width: 60%;
+    }
+    .comments-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.75rem;
+    }
+    .comments-field {
+      flex: 1 1 45%;
+      min-width: 180px;
+    }
+    .comments-line.inline {
+      display: inline-block;
+      width: auto;
+      min-width: 35%;
+      margin-right: 1rem;
+      vertical-align: middle;
+    }
     @media (max-width: 768px) {
       body { padding: 0 0.5rem; }
       .report-form {
@@ -1419,14 +1606,31 @@ export default function registerExamRoutes(app) {
       .subjects-table { min-width: 600px; }
     }
     @media print {
-      body { background: white; -webkit-print-color-adjust: exact; }
-      .page-break { page-break-after: always; }
-      .report-form { box-shadow: none; margin-bottom: 0; max-width: 900px; }
-      /* Expand scroll wrappers so content prints fully */
+      @page { size: A4 portrait; margin: 12mm; }
+      body { background: white; -webkit-print-color-adjust: exact; margin: 0; }
+      .page-break { margin-bottom: 0; }
+      .page-break:not(:last-child) { page-break-after: always; }
+      .report-form { box-shadow: none; margin: 0 auto; width: calc(210mm - 24mm); max-width: calc(210mm - 24mm); page-break-inside: avoid; padding: 1rem; }
+      .header { margin-bottom: 0.65rem; padding-bottom: 0.45rem; }
+      .header h1 { font-size: 1.2rem; }
+      .header .subtitle { font-size: 0.85rem; }
+      .learner-info { padding: 0.6rem; gap: 0.35rem 0.9rem; }
+      .info-row { padding: 0.1rem 0; }
+      .info-label { font-size: 0.9rem; }
+      .info-value { font-size: 0.9rem; }
+      .subjects-table th,
+      .subjects-table td { padding: 0.25rem 0.35rem; font-size: 0.78rem; }
+      .footer { margin-top: 0.85rem; padding-top: 0.5rem; font-size: 0.78rem; }
+      .comments-wrap { margin-top: 0.85rem; }
+      .comments-title { font-weight: 600; margin-bottom: 0.25rem; font-size: 0.9rem; }
+      .comments-line { min-height: 1rem; margin: 0 0 0.55rem; }
+      .comments-row { gap: 0.6rem; }
+      .comments-field { min-width: 170px; }
+      .comments-line.short { width: 60%; }
+      .back-button { display: none; }
       .table-wrap, .info-wrap, .meta-wrap { overflow: visible !important; -webkit-overflow-scrolling: auto; }
       .subjects-table, .subject-table { min-width: 0 !important; width: 100% !important; }
       .learner-info, .learner-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .back-button { display: none; }
     }
   </style>
 </head>
@@ -1490,6 +1694,39 @@ export default function registerExamRoutes(app) {
       html += `
         </tbody>
         </table>
+      </div>
+
+      <div class="comments-wrap">
+        <p class="comments-title">Class teacher's comments on competencies achieved/behavior/acquisition of values /performance Level</p>
+        <div class="comments-line"></div>
+        <div class="comments-line"></div>
+        <div class="comments-line"></div>
+        <div class="comments-line"></div>
+        <div class="comments-line"></div>
+        <div class="comments-line"></div>
+        <div class="comments-line"></div>
+        <p class="comments-title">Learner’s general performance level</p>
+        <div class="comments-line"></div>
+        <div class="comments-line"></div>
+        <div class="comments-row">
+          <div class="comments-field">
+            <p class="comments-title">Closing Date</p>
+            <div class="comments-line short"></div>
+          </div>
+          <div class="comments-field">
+            <p class="comments-title">Opening Date</p>
+            <div class="comments-line short"></div>
+          </div>
+        </div>
+        <p class="comments-title">Class Teacher’s Signature</p>
+        <div class="comments-line short"></div>
+        <div class="comments-field" style="display:flex; align-items:center; gap:10px;">
+          <div style="flex:1;">
+            <p class="comments-title">Principal’s Signature</p>
+            <div class="comments-line short"></div>
+          </div>
+          <span style="font-size:0.95rem; color:#444; white-space:nowrap;">Official Stamp</span>
+        </div>
       </div>
 
       <div class="footer">

@@ -51,6 +51,218 @@ img {
   height: auto;
 }
 
+/* Align checkboxes neatly with form inputs */
+.form-check-input {
+  margin-top: 0.32rem;
+}
+
+/* Add top margin to EE/AE/ME/BE checklist columns */
+.substrand-checklist,
+.substrand-reflection-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 50px !important;
+  padding-top: 0;
+  align-items: stretch;
+}
+
+.strand-item,
+.substrand-item {
+  min-height: 34px !important;
+  height: auto !important;
+  padding: 0.30rem 0.4rem !important;
+  margin-bottom: 1px !important;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  border: 1px solid rgba(15,23,36,0.06) !important;
+  border-radius: 6px !important;
+  background: #ffffff;
+  box-shadow: 0 1px 0 rgba(16,24,40,0.02);
+  font-size: 0.92rem;
+  box-sizing: border-box;
+}
+
+.entry-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+}
+
+.entry-delete-btn {
+  border: none;
+  background: transparent;
+  color: #dc3545;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0 0.15rem;
+  cursor: pointer;
+  opacity: 0.8;
+}
+
+.entry-delete-btn:hover {
+  opacity: 1;
+}
+
+.substrand-item .entry-text {
+  margin: 0;
+  line-height: 1.1;
+  width: 100%;
+}
+
+.substrand-checklist .substrand-cell,
+.substrand-reflection-list .reflection-cell {
+  width: 100%;
+  min-height: 34px;
+  height: auto;
+  /* padding: 0.2rem 0.15rem; */
+  margin-top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d7deea;
+  border-radius: 6px;
+  background: #f8fafc;
+  box-sizing: border-box;
+  flex: 1 1 auto;
+}
+
+/* Neutralize Bootstrap spacing utilities that break per-row alignment */
+.substrand-cell.mb-2,
+.reflection-cell.mb-2,
+.substrand-cell.mb-1,
+.reflection-cell.mb-1 {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.substrand-checklist .substrand-cell input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  padding: 0;
+  accent-color: #2563eb;
+}
+
+.substrand-reflection-list textarea,
+.substrand-reflection-input {
+  width: 100%;
+  min-height: 22px;
+  height: 100%;
+  padding: 0 0.25rem;
+  resize: none;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  font-size: 0.9rem;
+  line-height: 1.1;
+  box-sizing: border-box;
+  margin: 0;
+}
+
+.substrand-reflection-list textarea:focus,
+.substrand-reflection-input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.substrand-editor .input-group {
+  margin-bottom: 0 !important;
+  gap: 0.5rem;
+  position: relative;
+}
+
+.substrand-input,
+input[name$='_strand'] {
+  display: block;
+  width: 100%;
+  min-height: 42px;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.75rem;
+  background: #ffffff;
+  box-sizing: border-box;
+  font-size: 0.95rem;
+  color: #111827;
+  margin-bottom: 0.5rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.substrand-input:focus,
+input[name$='_strand']:focus {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 0.15rem rgba(124, 58, 237, 0.15);
+  outline: none;
+}
+
+./* Two-color strand palette: pink (1) and green (2) */
+:root {
+  --strand-pink-bg: #fff1f2; --strand-pink-fg: #9f1239;
+  --strand-green-bg: #ecfdf5; --strand-green-fg: #065f46;
+}
+
+.strand-list .strand-item {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid rgba(0,0,0,0.04);
+  margin-bottom: 0.45rem;
+}
+
+.strand-list .strand-item .entry-text {
+  display: inline-block;
+  width: 100%;
+  padding: 0.15rem 0.35rem;
+  border-radius: 4px;
+}
+
+/* JS-applied classes: strand-color-1 => pink, strand-color-2 => green */
+.strand-item.strand-color-1,
+.substrand-item.strand-color-1 {
+  background: var(--strand-pink-bg) !important;
+  color: var(--strand-pink-fg) !important;
+  border-color: rgba(156, 23, 55, 0.15) !important;
+}
+.strand-item.strand-color-2,
+.substrand-item.strand-color-2 {
+  background: var(--strand-green-bg) !important;
+  color: var(--strand-green-fg) !important;
+  border-color: rgba(5, 111, 70, 0.15) !important;
+}
+
+.substrand-item.strand-color-1 .entry-text,
+.substrand-item.strand-color-2 .entry-text {
+  background: transparent !important;
+  color: inherit !important;
+}
+
+.strand-item .entry-text,
+.substrand-item .entry-text {
+  display: block;
+  width: 100%;
+  padding: 0.25rem 0.4rem;
+  border-radius: 6px;
+}
+
+.substrand-list .substrand-item .entry-text {
+  padding: 0.25rem 0.35rem;
+  border-radius: 6px;
+  display: inline-block;
+}
+.substrand-list .substrand-item:nth-child(odd) .entry-text { opacity: 0.98; }
+
+.inline-entry-edit {
+  min-height: 28px;
+  height: 28px;
+  width: 100%;
+  border: 1px solid #a8c5ff;
+  border-radius: 6px;
+  padding: 0.25rem 0.4rem;
+  font-size: 0.9rem;
+  background: #fff;
+}
+
 /* Make tables readable on small screens */
 .exam-table {
   font-size: 13px;
