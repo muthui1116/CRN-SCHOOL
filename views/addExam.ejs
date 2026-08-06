@@ -97,15 +97,17 @@
                       <input type="hidden" name="<%= subject.key %>_main">
                     </td>
                     <td class="align-top">
-                      <div class="input-group input-group-sm mb-2">
+                      <div class="input-group input-group-sm mb-2 input-with-action">
                         <input type="text" name="<%= subject.key %>_strand" class="form-control strand-input" data-subject="<%= subject.key %>" placeholder="e.g. Communication" autocomplete="off">
+                        <button type="button" class="btn btn-outline-secondary add-entry-button" data-subject="<%= subject.key %>" data-kind="strand" aria-label="Add strand">Add</button>
                       </div>
                       <div class="strand-list list-group list-group-flush" data-subject="<%= subject.key %>" data-strand-index="0"></div>
                     </td>
                     <td class="align-top">
                       <div class="substrand-editor" data-subject="<%= subject.key %>">
-                        <div class="input-group input-group-sm mb-2">
-                          <input type="text" class="form-control substrand-input" data-subject="<%= subject.key %>" placeholder="Type a sub-strand and press Enter" autocomplete="off">
+                        <div class="input-group input-group-sm mb-2 input-with-action">
+                          <input type="text" class="form-control substrand-input" data-subject="<%= subject.key %>" placeholder="Type a sub-strand and press Enter or click Add" autocomplete="off">
+                          <button type="button" class="btn btn-outline-secondary add-entry-button" data-subject="<%= subject.key %>" data-kind="substrand" aria-label="Add sub-strand">Add</button>
                         </div>
                         <div class="substrand-list list-group list-group-flush" data-subject="<%= subject.key %>" data-substrand-index="0"></div>
                       </div>
@@ -1056,6 +1058,28 @@
           });
         };
 
+        const bindAddButtons = () => {
+          document.querySelectorAll('.add-entry-button').forEach(button => {
+            if (button._addButtonInit) return; button._addButtonInit = true;
+            button.addEventListener('click', () => {
+              const kind = button.dataset.kind;
+              const subjectKey = button.dataset.subject;
+              if (!subjectKey || !kind) return;
+              const inputSelector = kind === 'strand' ? `input[name="${subjectKey}_strand"]` : `.substrand-input[data-subject="${subjectKey}"]`;
+              const input = document.querySelector(inputSelector);
+              if (!input) return;
+              const value = String(input.value || '').trim();
+              if (!value) return;
+              if (kind === 'strand') {
+                addStrandEntry(subjectKey, value, input);
+              } else {
+                addSubstrandEntry(subjectKey, value, input);
+              }
+              input.focus();
+            });
+          });
+        };
+
         const updateSubstrandSpacers = () => {
           document.querySelectorAll('.substrand-spacer').forEach(spacer => spacer.remove());
           document.querySelectorAll('.substrand-checklist, .substrand-reflection-list').forEach(container => {
@@ -1068,6 +1092,7 @@
         // initialize editors now and whenever subjects change
         initStrandEditors();
         initSubstrandEditors();
+        bindAddButtons();
         updateSubstrandSpacers();
         window.addEventListener('resize', () => {
           updateSubstrandSpacers();

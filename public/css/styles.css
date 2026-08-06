@@ -169,10 +169,59 @@ img {
   box-shadow: none;
 }
 
-.substrand-editor .input-group {
-  margin-bottom: 0 !important;
-  gap: 0.5rem;
+.substrand-editor .input-group,
+.input-group.input-group-sm {
+  margin-bottom: 2px !important;
+  gap: 0;
   position: relative;
+}
+
+.input-with-action {
+  display: flex;
+  align-items: stretch;
+}
+
+.input-with-action .form-control {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding-right: 0;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  border-right: 0;
+}
+
+.input-with-action .add-entry-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  flex-shrink: 0;
+  min-width: 3.4rem;
+  height: 42px;
+  box-sizing: border-box;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 0 0.75rem 0.75rem 0;
+  background: #ffffff;
+  color: #334155;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1;
+  padding: 0 0.8rem;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.input-with-action .add-entry-button:hover,
+.input-with-action .add-entry-button:focus {
+  background: #f8fafc;
+  border-color: #d1d5db;
+}
+
+.input-with-action .add-entry-button:active {
+  transform: none;
 }
 
 .substrand-input,
@@ -198,7 +247,7 @@ input[name$='_strand']:focus {
   outline: none;
 }
 
-./* Two-color strand palette: pink (1) and green (2) */
+/* Two-color strand palette: pink (1) and green (2) */
 :root {
   --strand-pink-bg: #fff1f2; --strand-pink-fg: #9f1239;
   --strand-green-bg: #ecfdf5; --strand-green-fg: #065f46;
