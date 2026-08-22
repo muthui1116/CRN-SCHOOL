@@ -1,21 +1,22 @@
 <%- include('partials/header') %>
 
-<div class="container py-5">
-  <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3 mb-4">
+<div class="container learner-page py-5">
+  <div class="learner-hero d-flex flex-column flex-md-row justify-content-between align-items-start gap-4 mb-4">
     <div>
-      <h1 class="h3 mb-1">Learner Dashboard</h1>
-      <p class="text-muted mb-0">Welcome back, <strong><%= user.name || user.email %></strong>. Review your exam results below.</p>
+      <p class="learner-eyebrow mb-2"><i class="fas fa-compass me-2"></i>Student portal</p>
+      <h1 class="h3 mb-2">Good to see you, <span><%= user.name || user.email %></span></h1>
+      <p class="learner-hero-copy mb-0">Your learning progress, assessment record, and homework in one place.</p>
     </div>
-    <div class="d-flex flex-column align-items-start align-items-md-end gap-2">
+    <div class="learner-actions d-flex flex-column align-items-start align-items-md-end gap-3">
       <div>
-        <span class="badge bg-primary me-1">Role: Learner</span>
+        <span class="learner-chip learner-chip-primary me-1"><i class="fas fa-user-graduate me-1"></i>Learner</span>
         <% const resolvedGrade = userProfile?.grade || user.grade; %>
         <% if (resolvedGrade) { %>
-          <span class="badge bg-secondary">Grade: <%= resolvedGrade %></span>
+          <span class="learner-chip"><i class="fas fa-layer-group me-1"></i>Grade <%= resolvedGrade %></span>
         <% } %>
       </div>
-        <div class="d-flex align-items-center gap-2 flex-wrap">
-        <label for="termSelect" class="mb-0 text-muted">Term</label>
+        <div class="learner-controls d-flex align-items-center gap-2 flex-wrap">
+        <label for="termSelect" class="visually-hidden">Select term</label>
         <select id="termSelect" class="form-select form-select-sm" onchange="window.location.href='/learner?term=' + this.value + '&assessment=' + (document.querySelector('[data-assessment-active]').dataset.assessment)">
           <% [1,2,3].forEach(term => { %>
             <option value="<%= term %>" <%= String(term) === String(selectedTerm) ? 'selected' : '' %> >Term <%= term %></option>
@@ -38,9 +39,12 @@
 
   <div class="row gy-4">
     <div class="col-12 col-xl-4">
-      <div class="card shadow-sm border-0">
+      <div class="card learner-card profile-card h-100">
         <div class="card-body">
-          <h5 class="card-title mb-3">My Profile</h5>
+          <div class="section-heading mb-4">
+            <span class="section-icon"><i class="fas fa-id-card"></i></span>
+            <div><p class="section-kicker mb-1">Account overview</p><h5 class="card-title mb-0">My Profile</h5></div>
+          </div>
           <dl class="row mb-0">
             <dt class="col-sm-5 text-muted">Name</dt>
             <dd class="col-sm-7"><%= userProfile?.name || user.name || 'N/A' %></dd>
@@ -65,13 +69,15 @@
     </div>
 
     <div class="col-12 col-xl-8">
-      <div class="card shadow-sm border-0">
+      <div class="card learner-card results-card">
         <div class="card-body">
-          <div class="d-flex justify-content-between align-items-center mb-3">
+          <div class="results-heading d-flex justify-content-between align-items-start gap-3 mb-4">
             <div>
-              <h5 class="card-title mb-0">My Exam Results</h5>
+              <p class="section-kicker mb-1">Academic record</p>
+              <h5 class="card-title mb-1">My Exam Results</h5>
               <small class="text-muted">Your performance across all subjects.</small>
             </div>
+            <span class="results-term">Term <%= selectedTerm %></span>
           </div>
 
           <% const hasAssessmentResults = learnerRecord || (subjectDefinitions && subjectDefinitions.length > 0); %>
@@ -95,7 +101,7 @@
 
             <% if (assessmentType === 'summative') { %>
               <div class="d-none d-md-block table-responsive">
-                <table class="table table-bordered align-middle mb-0">
+                <table class="table learner-results-table table-bordered align-middle mb-0">
                   <thead class="table-light">
                     <tr>
                       <th>Learning Area</th>
@@ -154,7 +160,7 @@
               </div>
             <% } else { %>
               <div class="d-none d-md-block table-responsive">
-                <table class="table table-bordered align-middle mb-0">
+                <table class="table learner-results-table table-bordered align-middle mb-0">
                   <thead class="table-light">
                     <tr>
                       <th>Learning Area</th>
@@ -170,17 +176,21 @@
                   </thead>
                   <tbody>
                     <% displayedSubjects.forEach(subject => { %>
-                      <tr>
-                        <td class="fw-semibold"><%= subject.label %></td>
-                        <td><%= subject.key %></td>
-                        <td><%= learnerSubjectRows[subject.key]?.strand || '—' %></td>
-                        <td><%= learnerSubjectRows[subject.key]?.sub_strand || '—' %></td>
-                        <td class="text-center"><%= learnerSubjectRows[subject.key]?.ee ? '✔' : '—' %></td>
-                        <td class="text-center"><%= learnerSubjectRows[subject.key]?.ae ? '✔' : '—' %></td>
-                        <td class="text-center"><%= learnerSubjectRows[subject.key]?.me ? '✔' : '—' %></td>
-                        <td class="text-center"><%= learnerSubjectRows[subject.key]?.be ? '✔' : '—' %></td>
-                        <td><%= learnerSubjectRows[subject.key]?.reflection ? learnerSubjectRows[subject.key].reflection : '—' %></td>
-                      </tr>
+                      <% const subjectRow = learnerSubjectRows[subject.key] || {}; %>
+                      <% const entries = subjectRow.entries || [{ strand: subjectRow.strand, sub_strand: subjectRow.sub_strand, reflection: subjectRow.reflection, ee: subjectRow.ee, ae: subjectRow.ae, me: subjectRow.me, be: subjectRow.be }]; %>
+                      <% entries.forEach((entry, entryIndex) => { %>
+                        <tr>
+                          <td class="fw-semibold"><%= entryIndex === 0 ? subject.label : '' %></td>
+                          <td><%= entryIndex === 0 ? subject.key : '' %></td>
+                          <td><%= entry.strand || (entryIndex === 0 ? (subjectRow.strand || '—') : '') %></td>
+                          <td><%= entry.sub_strand || '—' %></td>
+                          <td class="text-center"><%= entry.ee ? '✔' : '—' %></td>
+                          <td class="text-center"><%= entry.ae ? '✔' : '—' %></td>
+                          <td class="text-center"><%= entry.me ? '✔' : '—' %></td>
+                          <td class="text-center"><%= entry.be ? '✔' : '—' %></td>
+                          <td><%= entry.reflection || '—' %></td>
+                        </tr>
+                      <% }) %>
                     <% }) %>
                   </tbody>
                 </table>
@@ -189,27 +199,33 @@
               <div class="d-block d-md-none">
                 <div class="row row-cols-1 g-2">
                   <div class="col">
-                    <div class="card shadow-sm">
+                    <div class="learner-mobile-results card shadow-sm">
                       <div class="card-body p-3">
                         <div class="row row-cols-1 g-3">
                           <% displayedSubjects.forEach(subject => { %>
-                            <div class="col">
-                              <small class="d-block text-muted"><%= subject.label %></small>
-                              <div><strong><%= subject.key %></strong></div>
-                              <div class="small mt-2">
-                                <strong>Strand:</strong> <%= learnerSubjectRows[subject.key]?.strand || '—' %><br>
-                                <strong>Sub-strand:</strong> <%= learnerSubjectRows[subject.key]?.sub_strand || '—' %>
+                            <% const subjectRow = learnerSubjectRows[subject.key] || {}; %>
+                            <% const entries = subjectRow.entries || [{ strand: subjectRow.strand, sub_strand: subjectRow.sub_strand, reflection: subjectRow.reflection, ee: subjectRow.ee, ae: subjectRow.ae, me: subjectRow.me, be: subjectRow.be }]; %>
+                            <% entries.forEach((entry, entryIndex) => { %>
+                              <div class="col">
+                                <% if (entryIndex === 0) { %>
+                                  <small class="d-block text-muted"><%= subject.label %></small>
+                                  <div><strong><%= subject.key %></strong></div>
+                                <% } %>
+                                <div class="small mt-2">
+                                  <strong>Strand:</strong> <%= entry.strand || '—' %><br>
+                                  <strong>Sub-strand:</strong> <%= entry.sub_strand || '—' %>
+                                </div>
+                                <div class="small mt-2">
+                                  EE: <%= entry.ee ? '✔' : '—' %><br>
+                                  AE: <%= entry.ae ? '✔' : '—' %><br>
+                                  ME: <%= entry.me ? '✔' : '—' %><br>
+                                  BE: <%= entry.be ? '✔' : '—' %>
+                                </div>
+                                <div class="small text-truncate" style="max-width: 220px;">
+                                  <strong>Ref:</strong> <%= entry.reflection || '—' %>
+                                </div>
                               </div>
-                              <div class="small mt-2">
-                                EE: <%= learnerSubjectRows[subject.key]?.ee ? '✔' : '—' %><br>
-                                AE: <%= learnerSubjectRows[subject.key]?.ae ? '✔' : '—' %><br>
-                                ME: <%= learnerSubjectRows[subject.key]?.me ? '✔' : '—' %><br>
-                                BE: <%= learnerSubjectRows[subject.key]?.be ? '✔' : '—' %>
-                              </div>
-                              <div class="small text-truncate" style="max-width: 220px;">
-                                <strong>Ref:</strong> <%= learnerSubjectRows[subject.key]?.reflection || '—' %>
-                              </div>
-                            </div>
+                            <% }) %>
                           <% }) %>
                         </div>
                       </div>
@@ -221,7 +237,7 @@
           <% } %>
 
           <% if (homeworkList && homeworkList.length > 0) { %>
-            <div class="mt-4">
+            <div class="homework-section mt-4">
               <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="card-title mb-0">Homework Assignments</h5>
                 <small class="text-muted"><%= homeworkList.length %> assignment(s)</small>

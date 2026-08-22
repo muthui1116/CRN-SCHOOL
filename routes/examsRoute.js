@@ -31,6 +31,18 @@ const examSubjectDefinitions = [
 ];
 const examSubjectKeys = examSubjectDefinitions.map(subject => subject.key);
 
+const canonicalSubjectCodes = {
+  '101': '901',
+  '102': '902',
+  '103': '903',
+  '105': '905',
+  '106': '906',
+  '107': '907',
+  '108': '908',
+  '111': '911',
+  '112': '912',
+};
+
 const normalizeSubjectCode = code =>
   code
     .toString()
@@ -39,18 +51,32 @@ const normalizeSubjectCode = code =>
     .replace(/[^a-z0-9_]+/g, '_')
     .replace(/^_+|_+$/g, '');
 
+const getCanonicalSubjectCode = code => {
+  const normalizedCode = String(code ?? '').trim();
+  return canonicalSubjectCodes[normalizedCode] || normalizedCode;
+};
+
+const escapeHtml = value => String(value ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
 const getSubjectDefinitionsFromDb = async () => {
   try {
-    const result = await db.query("SELECT name, code FROM subjects ORDER BY name ASC");
+    const result = await db.query(
+      "SELECT DISTINCT ON (subject_code) name, subject_code::integer AS code FROM subjects WHERE subject_code ~ '^[0-9]+$' ORDER BY subject_code, id ASC",
+    );
     const subjects = result.rows
       .map(row => {
-        const key = row.code ? normalizeSubjectCode(row.code) : normalizeSubjectCode(row.name);
-        return { key, label: row.name };
+        const key = normalizeSubjectCode(row.code);
+        return { key, label: row.name || row.code, code: row.code };
       });
-    return subjects.length ? subjects : examSubjectDefinitions;
+    return subjects;
   } catch (err) {
     console.error('Failed to load subjects from DB:', err.message);
-    return examSubjectDefinitions;
+    return [];
   }
 };
 
@@ -92,22 +118,6 @@ export default function registerExamRoutes(app) {
     let normalizedGrade = null;
     if (grade) {
       normalizedGrade = grade.toString().trim();
-      const activeSubjectsResult = await db.query(
-        `SELECT DISTINCT rs.subject_code, rs.subject_name
-         FROM learner_result_subjects rs
-         JOIN learners l ON rs.learner_id = l.id
-         WHERE rs.term = $1 AND (LOWER(l.grade) = LOWER($2) OR LOWER(l.grade) = LOWER($3))
-         ORDER BY rs.subject_name ASC`,
-        [selectedTerm, normalizedGrade, `Grade ${normalizedGrade}`]
-      );
-      if (activeSubjectsResult.rows.length > 0) {
-        subjectDefinitions = activeSubjectsResult.rows.map(row => ({
-          key: normalizeSubjectCode(row.subject_code || row.subject_name),
-          label: row.subject_name || row.subject_code
-        }));
-        subjectKeys = subjectDefinitions.map(subject => subject.key);
-      }
-
       const result = await db.query(
         `SELECT lr.id AS result_id, lr.learner_id, lr.term,
                 lr.english, lr.english_pl, lr.english_points, lr.english_cat1, lr.english_cat2, lr.english_main,
@@ -128,20 +138,6 @@ export default function registerExamRoutes(app) {
         [normalizedGrade, selectedTerm, `Grade ${normalizedGrade}`]
       );
       learners = result.rows;
-
-      learners = learners.map(l => {
-        let sum = 0;
-        let count = 0;
-        for (const k of subjectKeys) {
-          const n = Number(l[k]);
-          if (Number.isFinite(n)) {
-            sum += n;
-            count += 1;
-          }
-        }
-        const avrg = count === subjectKeys.length ? Math.round(sum / subjectKeys.length) : null;
-        return { ...l, avrg, evrg: l.evrg ?? avrg };
-      });
 
       learners.sort((a, b) => {
         const aEvrg = Number(a.evrg);
@@ -317,7 +313,7 @@ export default function registerExamRoutes(app) {
       ? selected_subjects.map(String).map(s => s.trim()).filter(Boolean)
       : (selected_subjects || '').split(',').map(s => s.trim()).filter(Boolean);
 
-    const subjectRows = await db.query("SELECT name, code FROM subjects");
+    const subjectRows = await db.query("SELECT name, subject_code AS code FROM subjects");
     const subjectMap = new Map(subjectRows.rows.map(row => {
       const key = normalizeSubjectCode(row.code || row.name);
       return [key, row.name];
@@ -335,6 +331,22 @@ export default function registerExamRoutes(app) {
       ...requestedSubjects,
       ...postedSubjects
     ]));
+
+    if (isContinuousAssessment) {
+      if (activeSubjects.length > 0) {
+        await db.query(
+          `DELETE FROM learner_result_subjects
+           WHERE learner_id = $1 AND term = $2 AND subject_code <> ALL($3::text[])`,
+          [learner_id, selectedTerm, activeSubjects],
+        );
+      } else {
+        await db.query(
+          `DELETE FROM learner_result_subjects
+           WHERE learner_id = $1 AND term = $2`,
+          [learner_id, selectedTerm],
+        );
+      }
+    }
 
     const parseRawMark = value => {
       if (value === '' || value === null || value === undefined) return null;
@@ -520,13 +532,27 @@ export default function registerExamRoutes(app) {
         const finalMark = convertExamMark(cat1, cat2, main);
         const { pl, points } = getGradeAndPoints(finalMark);
 
-        // presence flags for any substrand entry checkboxes
-        const ee = Object.keys(req.body).some(name => name.startsWith(`${subject}_line_`) && name.endsWith('_ee')) ? '1' : null;
-        const ae = Object.keys(req.body).some(name => name.startsWith(`${subject}_line_`) && name.endsWith('_ae')) ? '1' : null;
-        const me = Object.keys(req.body).some(name => name.startsWith(`${subject}_line_`) && name.endsWith('_me')) ? '1' : null;
-        const be = Object.keys(req.body).some(name => name.startsWith(`${subject}_line_`) && name.endsWith('_be')) ? '1' : null;
+        const entryIndexes = [...new Set(
+          Object.keys(req.body)
+            .map(name => name.match(new RegExp(`^${subject}_line_(\\d+)_`)))
+            .filter(Boolean)
+            .map(match => Number(match[1]))
+        )].sort((a, b) => a - b);
 
-        const strand = req.body[`${subject}_strand`] ? String(req.body[`${subject}_strand`]).trim() : null;
+        // Store one aligned value per substrand so the learner view can display each entry.
+        const entryValues = type => entryIndexes.map(index =>
+          req.body[`${subject}_line_${index}_${type}`] ? '1' : ''
+        ).join('\n');
+        const ee = entryIndexes.length ? entryValues('ee') : null;
+        const ae = entryIndexes.length ? entryValues('ae') : null;
+        const me = entryIndexes.length ? entryValues('me') : null;
+        const be = entryIndexes.length ? entryValues('be') : null;
+
+        const strandInput = req.body[`${subject}_strand`];
+        const strandValues = Array.isArray(strandInput)
+          ? strandInput.map(value => String(value || '').trim()).filter(Boolean)
+          : (strandInput ? [String(strandInput).trim()] : []);
+        const strand = strandValues.length ? strandValues.join('\n') : null;
 
         // collect substrand texts saved as <subject>_line_N_text inputs
         const substrandKeys = Object.keys(req.body).filter(k => k.startsWith(`${subject}_line_`) && k.endsWith('_text'));
@@ -536,7 +562,9 @@ export default function registerExamRoutes(app) {
 
         // collect reflection texts saved as <subject>_line_N_reflection inputs
         const reflectionKeys = Object.keys(req.body).filter(k => k.startsWith(`${subject}_line_`) && k.endsWith('_reflection'));
-        const reflectionValues = reflectionKeys.map(k => String(req.body[k] || '').trim()).filter(v => v !== '');
+        const reflectionValues = entryIndexes.map(index =>
+          String(req.body[`${subject}_line_${index}_reflection`] || '').trim()
+        );
         let reflection = null;
         if (reflectionValues.length) {
           reflection = reflectionValues.join('\n');
@@ -735,11 +763,13 @@ export default function registerExamRoutes(app) {
     const selectedAssessmentType = assessment === 'summative' ? 'summative' : 'continous';
 
     const activeSubjectsResult = await db.query(
-      `SELECT DISTINCT rs.subject_code, rs.subject_name
+      `SELECT DISTINCT ON (rs.subject_code) rs.subject_code, rs.subject_name
        FROM learner_result_subjects rs
        JOIN learners l ON rs.learner_id = l.id
-       WHERE rs.term = $1 AND (LOWER(l.grade) = LOWER($2) OR LOWER(l.grade) = LOWER($3))
-       ORDER BY rs.subject_name ASC`,
+       WHERE rs.term = $1
+         AND BTRIM(rs.subject_code) ~ '^9(0[1-9]|1[0-2])$'
+         AND (LOWER(l.grade) = LOWER($2) OR LOWER(l.grade) = LOWER($3))
+       ORDER BY rs.subject_code, rs.subject_name ASC`,
       [selectedTerm, normalizedGrade, `Grade ${normalizedGrade}`]
     );
 
@@ -780,7 +810,10 @@ export default function registerExamRoutes(app) {
         `SELECT rs.learner_id, rs.subject_code, rs.subject_name, rs.final_mark, rs.pl, rs.points
          FROM learner_result_subjects rs
          JOIN learners l ON rs.learner_id = l.id
-         WHERE rs.term = $1 AND (LOWER(l.grade) = LOWER($2) OR LOWER(l.grade) = LOWER($3)) AND rs.learner_id = ANY($4)`,
+         WHERE rs.term = $1
+           AND BTRIM(rs.subject_code) ~ '^9(0[1-9]|1[0-2])$'
+           AND (LOWER(l.grade) = LOWER($2) OR LOWER(l.grade) = LOWER($3))
+           AND rs.learner_id = ANY($4)`,
         [selectedTerm, normalizedGrade, `Grade ${normalizedGrade}`, learnerIds]
       );
       subjectResult.rows.forEach(row => {
@@ -937,24 +970,28 @@ export default function registerExamRoutes(app) {
     const normalizedGrade = grade.toString().trim();
 
     const activeSubjectsResult = await db.query(
-      `SELECT DISTINCT rs.subject_code, rs.subject_name
+      `SELECT DISTINCT ON (rs.subject_code) rs.subject_code, rs.subject_name
        FROM learner_result_subjects rs
        JOIN learners l ON rs.learner_id = l.id
-       WHERE rs.term = $1 AND (LOWER(l.grade) = LOWER($2) OR LOWER(l.grade) = LOWER($3))
-       ORDER BY rs.subject_name ASC`,
+       WHERE rs.term = $1
+         AND BTRIM(rs.subject_code) ~ '^9(0[1-9]|1[0-2])$'
+         AND (LOWER(l.grade) = LOWER($2) OR LOWER(l.grade) = LOWER($3))
+       ORDER BY rs.subject_code, rs.subject_name ASC`,
       [selectedTerm, normalizedGrade, `Grade ${normalizedGrade}`]
     );
 
-    const subjectDefinitions = activeSubjectsResult.rows.length > 0
-      ? activeSubjectsResult.rows.map(row => ({
-          key: normalizeSubjectCode(row.subject_code || row.subject_name),
-          label: row.subject_name || row.subject_code,
-          code: row.subject_code || '-'
-        }))
-      : examSubjectDefinitions.map(subject => ({
-          ...subject,
-          code: subject.code || subject.key || '-'
-        }));
+    const subjectDefinitions = Array.from(activeSubjectsResult.rows.reduce((definitions, row) => {
+      const code = getCanonicalSubjectCode(row.subject_code || row.subject_name);
+      const key = normalizeSubjectCode(code);
+      if (!definitions.has(key)) {
+        definitions.set(key, {
+          key,
+          label: row.subject_name || code,
+          code: code || '-'
+        });
+      }
+      return definitions;
+    }, new Map()).values());
 
     const result = await db.query(
       `SELECT lr.id, lr.learner_id, lr.term, lr.evrg, lr.evrg_pl, lr.evrg_points, l.name, l.assessment_number, l.grade AS learner_grade, l.birth_certificate, l.class_teacher
@@ -976,11 +1013,14 @@ export default function registerExamRoutes(app) {
         `SELECT rs.learner_id, rs.subject_code, rs.subject_name, rs.final_mark, rs.pl, rs.points
          FROM learner_result_subjects rs
          JOIN learners l ON rs.learner_id = l.id
-         WHERE rs.term = $1 AND (LOWER(l.grade) = LOWER($2) OR LOWER(l.grade) = LOWER($3)) AND rs.learner_id = ANY($4)`,
+         WHERE rs.term = $1
+           AND BTRIM(rs.subject_code) ~ '^9(0[1-9]|1[0-2])$'
+           AND (LOWER(l.grade) = LOWER($2) OR LOWER(l.grade) = LOWER($3))
+           AND rs.learner_id = ANY($4)`,
         [selectedTerm, normalizedGrade, `Grade ${normalizedGrade}`, learnerIds]
       );
       subjectResult.rows.forEach(row => {
-        const key = normalizeSubjectCode(row.subject_code || row.subject_name);
+        const key = normalizeSubjectCode(getCanonicalSubjectCode(row.subject_code || row.subject_name));
         const existing = learnerSubjectMap.get(row.learner_id) || {};
         existing[key] = {
           mark: row.final_mark !== null ? row.final_mark : null,
@@ -998,7 +1038,9 @@ export default function registerExamRoutes(app) {
         key: subject.key,
         label: subject.label,
         code: subject.code || '-',
-        mark: subjectRows[subject.key]?.mark ?? null
+        mark: subjectRows[subject.key]?.mark !== null && subjectRows[subject.key]?.mark !== undefined
+          ? Number(subjectRows[subject.key].mark)
+          : null
       }));
 
       const validMarks = marks.filter(m => Number.isFinite(m.mark));
@@ -1044,6 +1086,7 @@ export default function registerExamRoutes(app) {
       .sort((a, b) => b.improvementScore - a.improvementScore || b.bestSubjectMark - a.bestSubjectMark || String(a.name).localeCompare(String(b.name)))
       .slice(0, 1);
 
+    const safeGrade = escapeHtml(normalizedGrade);
     const now = new Date();
     const day = String(now.getDate()).padStart(2, '0');
     const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -1056,7 +1099,7 @@ export default function registerExamRoutes(app) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Best In Report - Grade ${grade}</title>
+  <title>Best In Report - Grade ${safeGrade}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; color: #222; }
@@ -1130,7 +1173,7 @@ export default function registerExamRoutes(app) {
     </div>
     <div class="header">
       <div class="title">Best In & Most Improved Report</div>
-      <div class="subtitle">Grade ${grade} — Generated ${currentDate}</div>
+      <div class="subtitle">Grade ${safeGrade} — Generated ${escapeHtml(currentDate)}</div>
     </div>
 
     <div class="section">
@@ -1163,12 +1206,12 @@ export default function registerExamRoutes(app) {
       html += `
           <tr>
             <td>${idx + 1}</td>
-            <td>${learner.name || 'N/A'}</td>
-            <td>${learner.bestSubjectLabel || 'N/A'}</td>
-            <td>${learner.bestSubjectMark !== null ? learner.bestSubjectMark : 'N/A'}</td>
-            <td>${learner.bestSubjectGrade || 'N/A'}</td>
-            <td>${learner.bestSubjectPoints !== null ? learner.bestSubjectPoints : 'N/A'}</td>
-            <td>${learner.evrg !== null ? learner.evrg : 'N/A'}</td>
+            <td>${escapeHtml(learner.name || 'N/A')}</td>
+            <td>${escapeHtml(learner.bestSubjectLabel || 'N/A')}</td>
+            <td>${escapeHtml(learner.bestSubjectMark !== null ? learner.bestSubjectMark : 'N/A')}</td>
+            <td>${escapeHtml(learner.bestSubjectGrade || 'N/A')}</td>
+            <td>${escapeHtml(learner.bestSubjectPoints !== null ? learner.bestSubjectPoints : 'N/A')}</td>
+            <td>${escapeHtml(learner.evrg !== null ? learner.evrg : 'N/A')}</td>
           </tr>
 `;
     });
@@ -1198,11 +1241,11 @@ export default function registerExamRoutes(app) {
       html += `
           <tr>
             <td>${idx + 1}</td>
-            <td>${learner.name || 'N/A'}</td>
-            <td>${learner.bestSubjectLabel || 'N/A'}</td>
-            <td>${learner.bestSubjectMark !== null ? learner.bestSubjectMark : 'N/A'}</td>
-            <td>${learner.evrg !== null ? learner.evrg : 'N/A'}</td>
-            <td>${learner.improvementScore !== null ? learner.improvementScore : 'N/A'}</td>
+            <td>${escapeHtml(learner.name || 'N/A')}</td>
+            <td>${escapeHtml(learner.bestSubjectLabel || 'N/A')}</td>
+            <td>${escapeHtml(learner.bestSubjectMark !== null ? learner.bestSubjectMark : 'N/A')}</td>
+            <td>${escapeHtml(learner.evrg !== null ? learner.evrg : 'N/A')}</td>
+            <td>${escapeHtml(learner.improvementScore !== null ? learner.improvementScore : 'N/A')}</td>
           </tr>
 `;
     });
@@ -1218,14 +1261,14 @@ export default function registerExamRoutes(app) {
     learners.forEach(learner => {
       html += `
       <div class="learner-block card">
-        <h3>${learner.name || 'N/A'} — ${learner.grade || 'N/A'}</h3>
+        <h3>${escapeHtml(learner.name || 'N/A')} — ${escapeHtml(learner.grade || 'N/A')}</h3>
         <div class="meta-wrap">
           <div class="learner-meta">
-            <div class="meta-item"><strong>Assessment #:</strong>${learner.assessment_number || 'N/A'}</div>
-            <div class="meta-item"><strong>Birth Certificate:</strong>${learner.birth_certificate || 'N/A'}</div>
-            <div class="meta-item"><strong>Best Learning Area:</strong><span class="label-pill">${learner.bestSubjectLabel || 'N/A'}</span></div>
-            <div class="meta-item"><strong>Overall Average:</strong><span class="score">${learner.evrg !== null ? learner.evrg : 'N/A'}</span></div>
-            <div class="meta-item"><strong>Improvement Gap:</strong><span class="score">${learner.improvementScore !== null ? learner.improvementScore : 'N/A'}</span></div>
+            <div class="meta-item"><strong>Assessment #:</strong>${escapeHtml(learner.assessment_number || 'N/A')}</div>
+            <div class="meta-item"><strong>Birth Certificate:</strong>${escapeHtml(learner.birth_certificate || 'N/A')}</div>
+            <div class="meta-item"><strong>Best Learning Area:</strong><span class="label-pill">${escapeHtml(learner.bestSubjectLabel || 'N/A')}</span></div>
+            <div class="meta-item"><strong>Overall Average:</strong><span class="score">${escapeHtml(learner.evrg !== null ? learner.evrg : 'N/A')}</span></div>
+            <div class="meta-item"><strong>Improvement Gap:</strong><span class="score">${escapeHtml(learner.improvementScore !== null ? learner.improvementScore : 'N/A')}</span></div>
           </div>
         </div>
 
@@ -1245,11 +1288,11 @@ export default function registerExamRoutes(app) {
       learner.subjectRows.forEach(subject => {
         html += `
             <tr>
-              <td class="subject-name">${subject.label}</td>
-              <td>${subject.code}</td>
-              <td>${subject.mark}</td>
-              <td>${subject.performance}</td>
-              <td>${subject.points}</td>
+              <td class="subject-name">${escapeHtml(subject.label)}</td>
+              <td>${escapeHtml(subject.code)}</td>
+              <td>${escapeHtml(subject.mark)}</td>
+              <td>${escapeHtml(subject.performance)}</td>
+              <td>${escapeHtml(subject.points)}</td>
             </tr>
 `;
       });
@@ -1261,7 +1304,7 @@ export default function registerExamRoutes(app) {
 `;
     });
     html += `
-    <div class="report-footer">Generated on ${currentDate} | Grade ${grade} Best In / Most Improved Report</div>
+    <div class="report-footer">Generated on ${escapeHtml(currentDate)} | Grade ${safeGrade} Best In / Most Improved Report</div>
   </div>
 </body>
 </html>
@@ -1278,37 +1321,28 @@ export default function registerExamRoutes(app) {
     const normalizedGrade = grade ? grade.toString().trim() : '';
     const selectedAssessmentType = assessment === 'summative' ? 'summative' : 'continous';
 
-    const activeSubjectsResult = await db.query(
-      `SELECT DISTINCT rs.subject_code, rs.subject_name
-       FROM learner_result_subjects rs
-       JOIN learners l ON rs.learner_id = l.id
-       WHERE rs.term = $1 AND (LOWER(l.grade) = LOWER($2) OR LOWER(l.grade) = LOWER($3))
-       ORDER BY rs.subject_name ASC`,
-      [selectedTerm, normalizedGrade, `Grade ${normalizedGrade}`]
+    await db.query(
+      `DELETE FROM subjects
+       WHERE subject_code IS NULL OR BTRIM(subject_code) = '' OR subject_code !~ '^[0-9]+$'`,
     );
 
-    const subjects = activeSubjectsResult.rows.length > 0
-      ? activeSubjectsResult.rows.map(row => ({
-          key: normalizeSubjectCode(row.subject_code || row.subject_name),
-          label: row.subject_name || row.subject_code,
-          code: row.subject_code || '-'
-        }))
-      : [
-          { key: 'english', label: 'English', code: 'ENG' },
-          { key: 'kiswahili', label: 'Kiswahili', code: 'KIS' },
-          { key: 'mathematics', label: 'Mathematics', code: 'MAT' },
-          { key: 'integrated_science', label: 'Integrated Science', code: 'SCI' },
-          { key: 'agriculture', label: 'Agriculture', code: 'AGR' },
-          { key: 'social_studies', label: 'Social Studies', code: 'SST' },
-          { key: 'cre', label: 'CRE', code: 'CRE' },
-          { key: 'pre_technical', label: 'Pre-Technical', code: 'PT' },
-          { key: 'creative_arts', label: 'Creative Arts', code: 'ART' }
-        ];
+    const codedSubjectsResult = await db.query(
+      `SELECT name, subject_code::integer AS code
+       FROM subjects
+      WHERE subject_code ~ '^[0-9]+$'
+       ORDER BY id ASC`,
+    );
+
+    const subjects = codedSubjectsResult.rows.map(row => ({
+      key: normalizeSubjectCode(row.code),
+      label: row.name || row.code,
+      code: row.code,
+    }));
 
     let result;
     if (selectedAssessmentType === 'continous') {
       result = await db.query(
-        `SELECT DISTINCT l.id AS learner_id, l.name, l.grade, l.assessment_number, l.birth_certificate, l.class_teacher
+        `SELECT DISTINCT l.id AS learner_id, l.name, l.grade, l.assessment_number, l.birth_cert_no, l.birth_certificate, l.class_teacher
          FROM learners l
          JOIN learner_result_subjects rs ON rs.learner_id = l.id
          WHERE rs.term = $1 AND (LOWER(l.grade) = LOWER($2) OR LOWER(l.grade) = LOWER($3))
@@ -1319,7 +1353,7 @@ export default function registerExamRoutes(app) {
 
     if (!result || result.rows.length === 0) {
       result = await db.query(
-        `SELECT lr.id, lr.learner_id, lr.evrg, lr.evrg_pl, lr.evrg_points, l.name, l.grade, l.assessment_number, l.birth_certificate, l.class_teacher
+        `SELECT lr.id, lr.learner_id, lr.evrg, lr.evrg_pl, lr.evrg_points, l.name, l.grade, l.assessment_number, l.birth_cert_no, l.birth_certificate, l.class_teacher
          FROM learner_results lr
          JOIN learners l ON lr.learner_id = l.id
          WHERE (LOWER(l.grade) = LOWER($1) OR LOWER(l.grade) = LOWER($3)) AND lr.term = $2
@@ -1658,7 +1692,7 @@ export default function registerExamRoutes(app) {
             <span class="info-label">Grade:&nbsp;</span><span class="info-value">${learner.grade || 'N/A'}</span>
           </div>
           <div class="info-row">
-            <span class="info-label">Date:&nbsp;</span><span class="info-value">${currentDate}</span>
+            <span class="info-label">Birth Cert No:&nbsp;</span><span class="info-value">${learner.birth_cert_no || learner.birth_certificate || 'N/A'}</span>
           </div>
         </div>
       </div>
@@ -1749,14 +1783,7 @@ export default function registerExamRoutes(app) {
   // Homework routes
   app.get('/exams/homework', isAuthenticated, isTeacher, async (req, res) => {
     try {
-      const gradeRows = await db.query(
-        `SELECT grade
-         FROM learners
-         WHERE grade IS NOT NULL AND TRIM(grade) <> ''
-         GROUP BY grade
-         ORDER BY CASE WHEN grade ~ '^[0-9]+$' THEN CAST(grade AS INTEGER) ELSE 999 END, grade`
-      );
-      const grades = gradeRows.rows.map(row => String(row.grade));
+      const grades = Array.from({ length: 9 }, (_, index) => String(index + 1));
       const subjects = await getSubjectDefinitionsFromDb();
       res.render('addHomework.ejs', { grades, subjects, selectedGrade: null });
     } catch (err) {

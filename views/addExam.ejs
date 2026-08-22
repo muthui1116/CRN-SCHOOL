@@ -477,16 +477,7 @@
         };
 
         const findSavedState = () => {
-          const exact = localStorage.getItem(getStateKey());
-          if (exact) return exact;
-          const prefix = `exam_add_${gradeValue}_${selectedTermValue}_${assessmentTypeValue}_`;
-          for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (typeof key === 'string' && key.startsWith(prefix)) {
-              return localStorage.getItem(key);
-            }
-          }
-          return null;
+          return localStorage.getItem(getStateKey());
         };
 
         const loadFormState = () => {
@@ -542,6 +533,7 @@
 
         const populateLearnerScores = learnerId => {
           const learner = learnersData.find(l => String(l.id) === String(learnerId) || String(l.learner_id) === String(learnerId));
+          restoreDynamicEntryState({});
           subjectKeys().forEach(subject => {
             const row = document.querySelector(`.subject-row[data-subject="${subject}"]`);
             const cat1 = document.querySelector(`input[name="${subject}_cat1"]`);
@@ -566,33 +558,47 @@
                     strand: '',
                     substrand: ''
                   },
-                  strands: saved.strand ? [saved.strand] : [],
+                  strands: saved.strand ? String(saved.strand).split('\n').map(s => s.trim()).filter(Boolean) : [],
                   substrands: []
                 };
 
-                // split multi-line substrand/reflection into multiple entries
-                const substrandLines = saved.sub_strand ? String(saved.sub_strand).split('\n').map(s => s.trim()).filter(s => s !== '') : [];
-                const reflectionLines = saved.reflection ? String(saved.reflection).split('\n').map(s => s.trim()) : [];
-                if (substrandLines.length > 0) {
-                  substrandLines.forEach((text, idx) => {
+                // Keep every stored value aligned with its substrand index.
+                const splitSavedValues = value => value === null || value === undefined || value === ''
+                  ? []
+                  : String(value).split('\n');
+                const substrandLines = splitSavedValues(saved.sub_strand);
+                const reflectionLines = splitSavedValues(saved.reflection);
+                const checkLines = {
+                  ee: splitSavedValues(saved.ee),
+                  ae: splitSavedValues(saved.ae),
+                  me: splitSavedValues(saved.me),
+                  be: splitSavedValues(saved.be)
+                };
+                const entryCount = Math.max(
+                  substrandLines.length,
+                  reflectionLines.length,
+                  ...Object.values(checkLines).map(lines => lines.length)
+                );
+                if (entryCount > 0) {
+                  Array.from({ length: entryCount }, (_, idx) => {
                     dynamicEntries[subject].substrands.push({
-                      text,
-                      ee: !!saved.ee,
-                      ae: !!saved.ae,
-                      me: !!saved.me,
-                      be: !!saved.be,
+                      text: (substrandLines[idx] || '').trim(),
+                      ee: checkLines.ee[idx] === '1',
+                      ae: checkLines.ae[idx] === '1',
+                      me: checkLines.me[idx] === '1',
+                      be: checkLines.be[idx] === '1',
                       reflection: reflectionLines[idx] || '',
-                      parentStrandIndex: saved.strand ? 1 : null
+                      parentStrandIndex: saved.strand ? Math.min(idx + 1, String(saved.strand).split('\n').length) : null
                     });
                   });
                 } else if (saved.sub_strand || saved.reflection || saved.ee || saved.ae || saved.me || saved.be) {
                   // single fallback entry
                   dynamicEntries[subject].substrands.push({
                     text: saved.sub_strand || '',
-                    ee: !!saved.ee,
-                    ae: !!saved.ae,
-                    me: !!saved.me,
-                    be: !!saved.be,
+                    ee: saved.ee === '1' || saved.ee === true,
+                    ae: saved.ae === '1' || saved.ae === true,
+                    me: saved.me === '1' || saved.me === true,
+                    be: saved.be === '1' || saved.be === true,
                     reflection: saved.reflection || '',
                     parentStrandIndex: saved.strand ? 1 : null
                   });
@@ -1205,7 +1211,7 @@
             if (gradeSelect) {
               gradeInput.value = gradeSelect.value;
             }
-            saveFormState();
+            if (!skipSaveOnUnload) saveFormState();
           });
         }
       </script>

@@ -191,17 +191,7 @@
                   <th>Class Teacher</th>
 
                   <!-- Subject columns — each has: mark | grade | points -->
-                  <% const subjects = subjectDefinitions && subjectDefinitions.length ? subjectDefinitions : [
-                    { key: 'english', label: 'English' },
-                    { key: 'kiswahili', label: 'Kiswahili' },
-                    { key: 'mathematics', label: 'Mathematics' },
-                    { key: 'integrated_science', label: 'Int. Science' },
-                    { key: 'agriculture', label: 'Agriculture' },
-                    { key: 'social_studies', label: 'Social Studies' },
-                    { key: 'cre', label: 'CRE' },
-                    { key: 'pre_technical', label: 'Pre-Technical' },
-                    { key: 'creative_arts', label: 'Art and Craft' }
-                  ]; %>
+                  <% const subjects = subjectDefinitions || []; %>
                   <% subjects.forEach(subject => { %>
                     <th colspan="3" class="text-center border-start subject-header"><%= subject.label %></th>
                   <% }) %>
@@ -230,7 +220,7 @@
                   <td class="ps-3 text-muted"><%= l.learner_id || l.id || 'N/A' %></td>
                   <td class="fw-medium"><%= l.name || 'N/A' %></td>
                   <td><%= l.assessment_number || 'N/A' %></td>
-                  <td><%= l.birth_certificate || 'N/A' %></td>
+                  <td><%= l.birth_cert_no || l.birth_certificate || 'N/A' %></td>
                   <td><%= l.class_teacher || 'N/A' %></td>
 
                   <% subjects.forEach(subject => {

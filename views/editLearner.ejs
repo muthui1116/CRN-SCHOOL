@@ -1,3 +1,4 @@
+<%- include('partials/header') %>
 <% title = "Edit Learner"; %>
 <div class="row">
   <div class="col-12 col-md-8 offset-md-2">
@@ -20,8 +21,8 @@
             <input name="adn_no" value="<%= learner.adn_no || '' %>" class="form-control" />
           </div>
           <div class="mb-3">
-            <label>Birth Certificate</label>
-            <input name="birth_certificate" value="<%= learner.birth_certificate || '' %>" class="form-control" />
+            <label for="birth_cert_no">Birth Certificate Number</label>
+            <input id="birth_cert_no" type="text" name="birth_cert_no" value="<%= learner.birth_cert_no || learner.birth_certificate || '' %>" class="form-control" autocomplete="off" />
           </div>
           <div class="mb-3">
             <label>Grade</label>
@@ -74,5 +75,6 @@
     </div>
   </div>
 </div>
+<%- include('partials/footer') %>
 
 

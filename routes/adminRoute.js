@@ -85,6 +85,44 @@ export default function registerAdminRoutes(app) {
     }
   });
 
+  app.get("/grades/:id/edit", isAuthenticated, isManager, async (req, res) => {
+    try {
+      const gradeResult = await db.query(
+        "SELECT * FROM grade WHERE id = $1",
+        [req.params.id],
+      );
+      if (!gradeResult.rows[0]) return res.status(404).send("Grade not found");
+
+      const teacherResult = await fetchTeachersList();
+      res.render("editGrade.ejs", {
+        grade: gradeResult.rows[0],
+        teachers: teacherResult,
+      });
+    } catch (err) {
+      console.error("Get grade error:", err.message);
+      res.status(500).send("Server error");
+    }
+  });
+
+  app.post("/grades/:id/edit", isAuthenticated, isManager, async (req, res) => {
+    try {
+      const { name, enrolment, class_teacher } = req.body;
+      await db.query(
+        "UPDATE grade SET name = $1, enrolment = $2, class_teacher = $3 WHERE id = $4",
+        [
+          name || null,
+          enrolment ? parseInt(enrolment, 10) : null,
+          class_teacher || null,
+          req.params.id,
+        ],
+      );
+      res.redirect("/grades");
+    } catch (err) {
+      console.error("Update grade error:", err.message);
+      res.status(500).send("Server error");
+    }
+  });
+
   app.post("/grades/delete/:id", isAuthenticated, isManager, async (req, res) => {
     try {
       await db.query("DELETE FROM grade WHERE id = $1", [req.params.id]);
@@ -319,6 +357,9 @@ export default function registerAdminRoutes(app) {
 
   app.get("/subjects", isAuthenticated, isManager, async (req, res) => {
     try {
+      await db.query(
+        "DELETE FROM subjects WHERE subject_code IS NULL OR BTRIM(subject_code) = ''",
+      );
       const result = await db.query("SELECT * FROM subjects ORDER BY id ASC");
       res.render("adminDashboard.ejs", {
         page: "subjects",
@@ -344,8 +385,8 @@ export default function registerAdminRoutes(app) {
         .replace(/[^a-z0-9_]+/g, '_')
         .replace(/^_+|_+$/g, '');
       await db.query(
-        "INSERT INTO subjects (name, code, description) VALUES ($1, $2, $3)",
-        [name || null, normalizedCode || null, description || null],
+        "INSERT INTO subjects (name, code, subject_code, description) VALUES ($1, $2, $3, $4)",
+        [name || null, normalizedCode || null, normalizedCode || null, description || null],
       );
       res.redirect("/subjects");
     } catch (err) {
@@ -386,8 +427,8 @@ export default function registerAdminRoutes(app) {
           .replace(/[^a-z0-9_]+/g, '_')
           .replace(/^_+|_+$/g, '');
         await db.query(
-          "UPDATE subjects SET name = $1, code = $2, description = $3 WHERE id = $4",
-          [name || null, normalizedCode || null, description || null, req.params.id],
+          "UPDATE subjects SET name = $1, code = $2, subject_code = $3, description = $4 WHERE id = $5",
+          [name || null, normalizedCode || null, normalizedCode || null, description || null, req.params.id],
         );
         res.redirect("/subjects");
       } catch (err) {
@@ -445,15 +486,15 @@ export default function registerAdminRoutes(app) {
 
   app.post("/learners/add", isAuthenticated, isManager, async (req, res) => {
     try {
-      const { name, assessment_number, adn_no, birth_certificate, grade, class_teacher, responsibility } =
+      const { name, assessment_number, adn_no, birth_cert_no, birth_certificate, grade, class_teacher, responsibility } =
         req.body;
       await db.query(
-        `INSERT INTO learners (name, assessment_number, adn_no, birth_certificate, grade, class_teacher, responsibility) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        `INSERT INTO learners (name, assessment_number, adn_no, birth_cert_no, birth_certificate, grade, class_teacher, responsibility) VALUES ($1, $2, $3, $4, $4, $5, $6, $7)`,
         [
           name || null,
           assessment_number || null,
           adn_no || null,
-          birth_certificate || null,
+          birth_cert_no || birth_certificate || null,
           grade || null,
           class_teacher || null,
           responsibility || null,
@@ -509,13 +550,15 @@ export default function registerAdminRoutes(app) {
           sanitized[k] = val;
         }
 
+        const birthCertNo = sanitized.birth_cert_no ?? sanitized.birth_certificate;
+
         // Validate numeric subject scores (they may be present in the form)
         const scoreValidation = validateSubjectScores(sanitized);
         if (!scoreValidation.valid) return res.status(400).send(scoreValidation.message);
 
         // Update only real `learners` columns
         const learnerKeys = [
-          'name','assessment_number','adn_no','birth_certificate','grade','class_teacher','responsibility'
+          'name','assessment_number','adn_no','grade','class_teacher','responsibility'
         ];
 
         const learnerFields = [];
@@ -527,6 +570,12 @@ export default function registerAdminRoutes(app) {
             learnerValues.push(sanitized[k] === '' || sanitized[k] === undefined ? null : sanitized[k]);
             li++;
           }
+        }
+
+        if (birthCertNo !== undefined) {
+          learnerFields.push(`birth_cert_no = $${li}`, `birth_certificate = $${li}`);
+          learnerValues.push(birthCertNo === '' ? null : birthCertNo);
+          li++;
         }
 
         if (learnerFields.length > 0) {

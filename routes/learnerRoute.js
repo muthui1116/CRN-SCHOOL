@@ -15,6 +15,11 @@ function normalizeGrade(value) {
   return normalized.replace(/^grade\s*/i, '').trim();
 }
 
+function splitStoredValues(value) {
+  if (value === null || value === undefined || value === '') return [];
+  return String(value).split('\n');
+}
+
 async function resolveLearnerGrade(userProfile) {
   let grade = normalizeGrade(userProfile.grade);
   if (grade) return grade;
@@ -70,6 +75,50 @@ const normalizeSubjectCode = code =>
     .replace(/[^a-z0-9_]+/g, '_')
     .replace(/^_+|_+$/g, '');
 
+const summativeSubjectFallbacks = [
+  ['english', 'English', '901'],
+  ['kiswahili', 'Kiswahili', '902'],
+  ['mathematics', 'Mathematics', '903'],
+  ['integrated_science', 'Integrated Science', '905'],
+  ['agriculture', 'Agriculture', '906'],
+  ['social_studies', 'Social Studies', '907'],
+  ['cre', 'Christian Religious Education (CRE)', '908'],
+  ['creative_arts', 'Creative Arts & Sports', '911'],
+  ['pre_technical', 'Pre-Technical Studies', '912'],
+].map(([key, label, code]) => ({ key, label, code }));
+
+const summativeKeyByCode = {
+  '101': 'english',
+  '901': 'english',
+  '102': 'kiswahili',
+  '902': 'kiswahili',
+  '103': 'mathematics',
+  '903': 'mathematics',
+  '105': 'integrated_science',
+  '905': 'integrated_science',
+  '106': 'agriculture',
+  '906': 'agriculture',
+  '107': 'social_studies',
+  '907': 'social_studies',
+  '108': 'cre',
+  '908': 'cre',
+  '111': 'creative_arts',
+  '911': 'creative_arts',
+  '112': 'pre_technical',
+  '912': 'pre_technical',
+};
+
+function getSummativeSubjectKey(row) {
+  const codeKey = summativeKeyByCode[String(row.subject_code || '').trim()];
+  if (codeKey) return codeKey;
+
+  const nameKey = normalizeSubjectCode(row.subject_name || '');
+  if (nameKey === 'christian_religious_education' || nameKey.endsWith('_cre')) return 'cre';
+  if (nameKey === 'creative_arts_sports') return 'creative_arts';
+  if (nameKey === 'pre_technical_studies') return 'pre_technical';
+  return nameKey;
+}
+
 function isLearner(req, res, next) {
   if (req.isAuthenticated && req.isAuthenticated() && req.user && req.user.role === 3) {
     return next();
@@ -84,7 +133,6 @@ export default function registerLearnerRoutes(app) {
         "SELECT id, name, email, phone, role, grade, assessment_number, profile_image, date_created FROM users WHERE id = $1",
         [req.user.id],
       );
-
       const userProfile = userResult.rows[0] || {};
       let grade = normalizeGrade(userProfile.grade) || normalizeGrade(req.user.grade);
       let learnerRecord = null;
@@ -143,26 +191,25 @@ export default function registerLearnerRoutes(app) {
           );
           learnerRecord = specificLearner.rows[0] || null;
 
-          const subjectLabels = {
-            english: 'English',
-            kiswahili: 'Kiswahili',
-            mathematics: 'Mathematics',
-            integrated_science: 'Integrated Science',
-            agriculture: 'Agriculture',
-            social_studies: 'Social Studies',
-            cre: 'CRE',
-            pre_technical: 'Pre-Technical',
-            creative_arts: 'Art and Craft'
-          };
+          subjectDefinitions = summativeSubjectFallbacks;
+          const continuousMarks = await db.query(
+            `SELECT subject_code, subject_name, final_mark, pl, points
+             FROM learner_result_subjects
+             WHERE learner_id = $1 AND term = $2`,
+            [learnerId, selectedTerm],
+          );
+          const continuousMarkMap = {};
+          continuousMarks.rows.forEach(row => {
+            const key = getSummativeSubjectKey(row);
+            continuousMarkMap[key] = row;
+          });
 
-          subjectDefinitions = Object.entries(subjectLabels).map(([key, label]) => ({ key, label }));
-
-          if (learnerRecord) {
-            subjectDefinitions.forEach(subject => {
-              learnerSubjectRows[subject.key] = {
-                mark: learnerRecord[subject.key] !== null ? learnerRecord[subject.key] : null,
-                pl: learnerRecord[`${subject.key}_pl`] || null,
-                points: learnerRecord[`${subject.key}_points`] || null,
+          subjectDefinitions.forEach(subject => {
+            const continuousRow = continuousMarkMap[subject.key];
+            learnerSubjectRows[subject.key] = {
+                mark: learnerRecord?.[subject.key] ?? continuousRow?.final_mark ?? null,
+                pl: learnerRecord?.[`${subject.key}_pl`] || continuousRow?.pl || null,
+                points: learnerRecord?.[`${subject.key}_points`] || continuousRow?.points || null,
                 ee: null,
                 ae: null,
                 me: null,
@@ -171,10 +218,10 @@ export default function registerLearnerRoutes(app) {
                 strand: null,
                 sub_strand: null,
                 lesson_title: null,
+                code: subject.code,
                 label: subject.label
-              };
-            });
-          }
+            };
+          });
         } else {
           const subjectResult = await db.query(
             `SELECT rs.subject_code, rs.subject_name, rs.final_mark, rs.pl, rs.points,
@@ -188,6 +235,32 @@ export default function registerLearnerRoutes(app) {
 
           subjectDefinitions = subjectResult.rows.map(row => {
             const key = normalizeSubjectCode(row.subject_code || row.subject_name || '');
+            const substrands = splitStoredValues(row.sub_strand);
+            const strands = splitStoredValues(row.strand);
+            const reflections = splitStoredValues(row.reflection);
+            const checks = {
+              ee: splitStoredValues(row.ee),
+              ae: splitStoredValues(row.ae),
+              me: splitStoredValues(row.me),
+              be: splitStoredValues(row.be)
+            };
+            const entryCount = Math.max(
+              strands.length,
+              substrands.length,
+              reflections.length,
+              ...Object.values(checks).map(values => values.length),
+              1
+            );
+            const entries = Array.from({ length: entryCount }, (_, index) => ({
+              sub_strand: substrands[index] || null,
+              strand: strands[index] || null,
+              reflection: reflections[index] || null,
+              ee: checks.ee[index] === '1',
+              ae: checks.ae[index] === '1',
+              me: checks.me[index] === '1',
+              be: checks.be[index] === '1'
+            }));
+
             learnerSubjectRows[key] = {
               mark: row.final_mark !== null ? row.final_mark : null,
               pl: row.pl || null,
@@ -201,6 +274,7 @@ export default function registerLearnerRoutes(app) {
               strand: row.strand || null,
               sub_strand: row.sub_strand || null,
               lesson_title: row.lesson_title || null,
+              entries,
               label: row.subject_name || row.subject_code || ''
             };
             return {
