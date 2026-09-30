@@ -1,6 +1,7 @@
 import db from "../db.js";
 import path from "path";
 import homeworkUpload from "../homeworkUpload.js";
+import { lessonNoteDocumentHtml, lessonNoteFilename, lessonNoteContentHtml } from "../utils/lessonNoteDocument.js";
 
 function isAuthenticated(req, res, next) {
   if (req.isAuthenticated && req.isAuthenticated()) {
@@ -298,6 +299,21 @@ export default function registerLearnerRoutes(app) {
         [learnerId || null, grade],
       );
       const homeworkList = homeworkResult.rows || [];
+      const lessonNotesResult = grade
+        ? await db.query(
+          `SELECT ln.id, ln.grade, ln.term, ln.subject_name, ln.strand, ln.sub_strand,
+                  ln.week_no, ln.lesson_no, ln.lesson_content, ln.updated_at, u.name AS teacher_name
+           FROM lesson_notes ln
+           JOIN users u ON u.id = ln.teacher_id
+           WHERE ln.grade = $1 AND ln.term = $2
+           ORDER BY ln.subject_name, ln.week_no, ln.lesson_no`,
+          [grade, selectedTerm]
+        )
+        : { rows: [] };
+      const lessonNotes = lessonNotesResult.rows.map(note => ({
+        ...note,
+        contentHtml: lessonNoteContentHtml(note.lesson_content),
+      }));
 
       console.log("Learner Route Debug:", {
         userId: req.user.id,
@@ -319,6 +335,7 @@ export default function registerLearnerRoutes(app) {
         homeworkList,
         subjectDefinitions,
         learnerSubjectRows,
+        lessonNotes,
         assessmentType,
         showContinuousAssessment,
       });
@@ -328,6 +345,33 @@ export default function registerLearnerRoutes(app) {
         message: "Error loading learner dashboard.",
         user: req.user,
       });
+    }
+  });
+
+  app.get("/learner/lesson-notes/:id/download", isAuthenticated, isLearner, async (req, res) => {
+    try {
+      const userResult = await db.query(
+        "SELECT id, name, grade, assessment_number FROM users WHERE id = $1",
+        [req.user.id]
+      );
+      const grade = await resolveLearnerGrade(userResult.rows[0] || {});
+      if (!grade) return res.status(404).send("Lesson notes not found.");
+
+      const result = await db.query(
+        `SELECT id, grade, term, subject_name, strand, sub_strand, week_no, lesson_no, lesson_content
+         FROM lesson_notes
+         WHERE id = $1 AND grade = $2`,
+        [req.params.id, grade]
+      );
+      const note = result.rows[0];
+      if (!note) return res.status(404).send("Lesson notes not found.");
+
+      res.setHeader("Content-Type", "application/msword; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="${lessonNoteFilename(note)}"`);
+      res.send(lessonNoteDocumentHtml(note));
+    } catch (err) {
+      console.error("Lesson note download error:", err.message);
+      res.status(500).send("Unable to download lesson notes.");
     }
   });
 

@@ -3,6 +3,7 @@ import db from "../db.js";
 import path from "path";
 import getGradeAndPoints from "../utils/getGradeAndPoints.js";
 import homeworkUpload from "../homeworkUpload.js";
+import { lessonNoteDocumentHtml, lessonNoteFilename } from "../utils/lessonNoteDocument.js";
 
 function isAuthenticated(req, res, next) {
   if (req.isAuthenticated && req.isAuthenticated()) {
@@ -208,6 +209,112 @@ export default function registerExamRoutes(app) {
       submittedHomework,
       subjectDefinitions,
     });
+  });
+
+  app.get('/exams/learning-areas', isAuthenticated, isTeacher, async (req, res) => {
+    const grade = String(req.query.grade || '').trim();
+    const selectedTerm = ["1", "2", "3"].includes(req.query.term) ? req.query.term : "1";
+    if (!/^[1-9]$/.test(grade)) {
+      return res.redirect('/exams');
+    }
+
+    const result = await db.query(
+      `SELECT DISTINCT ON (COALESCE(NULLIF(BTRIM(subject_code), ''), name))
+              name, COALESCE(NULLIF(BTRIM(subject_code), ''), name) AS subject_code
+       FROM subjects
+       WHERE name IS NOT NULL AND BTRIM(name) <> ''
+       ORDER BY COALESCE(NULLIF(BTRIM(subject_code), ''), name), id ASC`
+    );
+    const selectedSubjectCode = String(req.query.subject_code || '');
+    const selectedArea = result.rows.find(area => area.subject_code === selectedSubjectCode) || null;
+    const noteResult = selectedArea
+      ? await db.query(
+        `SELECT id, strand, sub_strand, week_no, lesson_no, lesson_content
+         FROM lesson_notes
+         WHERE teacher_id = $1 AND grade = $2 AND term = $3 AND subject_code = $4
+         ORDER BY lesson_no, created_at, id`,
+        [req.user.id, grade, selectedTerm, selectedSubjectCode]
+      )
+      : { rows: [] };
+
+    res.render('examLearningAreas.ejs', {
+      selectedGrade: grade,
+      selectedTerm,
+      learningAreas: result.rows,
+      selectedSubjectCode: selectedArea ? selectedSubjectCode : '',
+      selectedArea,
+      lessonNotes: noteResult.rows,
+      saved: req.query.saved === '1',
+      invalid: req.query.invalid === '1',
+    });
+  });
+
+  app.post('/exams/learning-areas', isAuthenticated, isTeacher, async (req, res) => {
+    const grade = String(req.body.grade || '').trim();
+    const selectedTerm = String(req.body.term || '');
+    const subjectCode = String(req.body.subject_code || '').trim();
+    const strand = String(req.body.strand || '').trim();
+    const subStrand = String(req.body.sub_strand || '').trim();
+    const weekNo = Number(req.body.week_no);
+    const lessonNo = Number(req.body.lesson_no);
+    const lessonContent = String(req.body.lesson_content || '');
+    const pageUrl = `/exams/learning-areas?grade=${encodeURIComponent(grade)}&term=${encodeURIComponent(selectedTerm)}&subject_code=${encodeURIComponent(subjectCode)}`;
+
+    if (!/^[1-9]$/.test(grade) || !["1", "2", "3"].includes(selectedTerm)) {
+      return res.redirect('/exams');
+    }
+    if (!subjectCode || !strand || !subStrand || !Number.isInteger(weekNo) || weekNo < 1 || !Number.isInteger(lessonNo) || lessonNo < 1 || lessonContent.length > 100000) {
+      return res.redirect(`${pageUrl}&invalid=1`);
+    }
+
+    let parsedContent;
+    try {
+      parsedContent = JSON.parse(lessonContent);
+    } catch {
+      return res.redirect(`${pageUrl}&invalid=1`);
+    }
+    if (!parsedContent || !Array.isArray(parsedContent.ops)) {
+      return res.redirect(`${pageUrl}&invalid=1`);
+    }
+
+    const subjectResult = await db.query(
+      `SELECT name, COALESCE(NULLIF(BTRIM(subject_code), ''), name) AS subject_code
+       FROM subjects
+       WHERE COALESCE(NULLIF(BTRIM(subject_code), ''), name) = $1
+       ORDER BY id ASC
+       LIMIT 1`,
+      [subjectCode]
+    );
+    const subject = subjectResult.rows[0];
+    if (!subject) {
+      return res.redirect('/exams');
+    }
+
+    await db.query(
+      `INSERT INTO lesson_notes (
+        teacher_id, grade, term, subject_code, subject_name,
+        strand, sub_strand, week_no, lesson_no, lesson_content
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      RETURNING id`,
+      [req.user.id, grade, selectedTerm, subject.subject_code, subject.name, strand, subStrand, weekNo, lessonNo, JSON.stringify(parsedContent)]
+    );
+
+    res.redirect(`${pageUrl}&saved=1`);
+  });
+
+  app.get('/exams/lesson-notes/:id/download', isAuthenticated, isTeacher, async (req, res) => {
+    const result = await db.query(
+      `SELECT id, grade, term, subject_name, strand, sub_strand, week_no, lesson_no, lesson_content
+       FROM lesson_notes
+       WHERE id = $1 AND teacher_id = $2`,
+      [req.params.id, req.user.id]
+    );
+    const note = result.rows[0];
+    if (!note) return res.status(404).send('Lesson notes not found.');
+
+    res.setHeader('Content-Type', 'application/msword; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${lessonNoteFilename(note)}"`);
+    res.send(lessonNoteDocumentHtml(note));
   });
 
   app.get('/exams/add', isAuthenticated, isTeacher, async (req, res) => {

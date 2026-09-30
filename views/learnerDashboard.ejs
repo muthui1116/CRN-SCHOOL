@@ -37,6 +37,41 @@
     </div>
   </div>
 
+  <section class="card learner-card mb-4" aria-labelledby="lessonNotesHeading">
+    <div class="card-body">
+      <div class="section-heading mb-3">
+        <span class="section-icon"><i class="fas fa-book-open"></i></span>
+        <div>
+          <p class="section-kicker mb-1">Class resources</p>
+          <h5 id="lessonNotesHeading" class="card-title mb-0">Lesson Notes</h5>
+        </div>
+      </div>
+      <% if (lessonNotes && lessonNotes.length) { %>
+        <div class="d-grid gap-3">
+          <% lessonNotes.forEach(note => { %>
+            <article class="border rounded p-3">
+              <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3">
+                <div>
+                  <h6 class="fw-semibold mb-1"><%= note.subject_name %> · Week <%= note.week_no %> · Lesson <%= note.lesson_no %></h6>
+                  <p class="small text-muted mb-2">Strand: <%= note.strand %> · Sub-Strand: <%= note.sub_strand %></p>
+                  <small class="text-muted">Notes Grade <%= note.grade %>, Term <%= note.term %><% if (note.teacher_name) { %> · <%= note.teacher_name %><% } %></small>
+                </div>
+                <a href="/learner/lesson-notes/<%= note.id %>/download" class="btn btn-sm btn-outline-primary flex-shrink-0">
+                  <i class="fas fa-download me-1"></i>Download
+                </a>
+              </div>
+              <% if (note.contentHtml) { %>
+                <div class="lesson-note-content border-top mt-3 pt-3"><%- note.contentHtml %></div>
+              <% } %>
+            </article>
+          <% }); %>
+        </div>
+      <% } else { %>
+        <p class="text-muted mb-0">No lesson notes are available for Term <%= selectedTerm %>.</p>
+      <% } %>
+    </div>
+  </section>
+
   <div class="row gy-4">
     <div class="col-12 col-xl-4">
       <div class="card learner-card profile-card h-100">
