@@ -154,6 +154,36 @@ const connectDatabase = async () => {
     `);
 
     await db.query(`
+      ALTER TABLE lesson_notes
+      ADD COLUMN IF NOT EXISTS school_name VARCHAR(150),
+      ADD COLUMN IF NOT EXISTS roll VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS lesson_time TIME
+    `);
+
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS teacher_notes (
+        id SERIAL PRIMARY KEY,
+        teacher_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        grade VARCHAR(2) NOT NULL,
+        term VARCHAR(2) NOT NULL,
+        subject_code VARCHAR(100) NOT NULL,
+        subject_name VARCHAR(100) NOT NULL,
+        title VARCHAR(150) NOT NULL,
+        content TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    `);
+
+    await db.query(`
+      ALTER TABLE teacher_notes
+      ADD COLUMN IF NOT EXISTS week_no INTEGER,
+      ADD COLUMN IF NOT EXISTS lesson_no INTEGER,
+      ADD COLUMN IF NOT EXISTS strand VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS sub_strand VARCHAR(255)
+    `);
+
+    await db.query(`
       CREATE TABLE IF NOT EXISTS learner_results (
         id SERIAL PRIMARY KEY,
         learner_id INTEGER NOT NULL REFERENCES learners(id) ON DELETE CASCADE,

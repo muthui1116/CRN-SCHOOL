@@ -1,4 +1,4 @@
-const escapeHtml = value => String(value ?? '')
+export const escapeHtml = value => String(value ?? '')
   .replace(/&/g, '&amp;')
   .replace(/</g, '&lt;')
   .replace(/>/g, '&gt;')
@@ -95,18 +95,27 @@ export const lessonNoteContentHtml = storedContent => {
   return blocks.join('');
 };
 
-export const lessonNoteDocumentHtml = note => `<!doctype html>
-<html><head><meta charset="utf-8"><title>${escapeHtml(note.subject_name)} lesson notes</title>
+const lessonPlanSubjectName = note => {
+  const subjectName = String(note.subject_name || 'Learning Area').trim();
+  return /\slesson plan$/i.test(subjectName) ? subjectName : `${subjectName} Lesson Plan`;
+};
+
+export const lessonNoteDocumentHtml = note => {
+  const subjectName = lessonPlanSubjectName(note);
+  return `<!doctype html>
+<html><head><meta charset="utf-8"><title>${escapeHtml(subjectName)}</title>
 <style>body{font-family:Calibri,Arial,sans-serif;line-height:1.5;margin:2cm;color:#222}h1{font-size:22pt}h2{font-size:16pt}table{border-collapse:collapse}img{max-width:100%}blockquote{border-left:3px solid #888;margin-left:0;padding-left:1em;color:#555}pre{white-space:pre-wrap;background:#f4f4f4;padding:1em}</style>
-</head><body><h1>${escapeHtml(note.subject_name)}</h1>
-<p><strong>Grade:</strong> ${escapeHtml(note.grade)} &nbsp; <strong>Term:</strong> ${escapeHtml(note.term)} &nbsp; <strong>Week:</strong> ${escapeHtml(note.week_no)} &nbsp; <strong>Lesson:</strong> ${escapeHtml(note.lesson_no)}</p>
+</head><body><h1>${escapeHtml(note.school_name || subjectName)}</h1>
+${note.school_name ? `<h2>${escapeHtml(subjectName)}</h2>` : ''}
+<p><strong>Name:</strong> ${escapeHtml(note.school_name || '')} &nbsp; <strong>Grade:</strong> ${escapeHtml(note.grade)} &nbsp; <strong>Term:</strong> ${escapeHtml(note.term)} &nbsp; <strong>Week:</strong> ${escapeHtml(note.week_no)} &nbsp; <strong>Lesson:</strong> ${escapeHtml(note.lesson_no)} &nbsp; <strong>Roll:</strong> ${escapeHtml(note.roll || '')} &nbsp; <strong>Time:</strong> ${escapeHtml(note.lesson_time || '')}</p>
 <p><strong>Strand:</strong> ${escapeHtml(note.strand)}<br><strong>Sub-Strand:</strong> ${escapeHtml(note.sub_strand)}</p>
 <hr>${lessonNoteContentHtml(note.lesson_content)}</body></html>`;
+};
 
 export const lessonNoteFilename = note => {
   const safeSubject = String(note.subject_name || 'learning-area')
     .replace(/[^a-z0-9]+/gi, '-')
     .replace(/^-|-$/g, '')
     .toLowerCase();
-  return `notes-grade-${note.grade}-${safeSubject}-term-${note.term}.doc`;
+  return `lesson-plan-grade-${note.grade}-${safeSubject}-term-${note.term}.doc`;
 };

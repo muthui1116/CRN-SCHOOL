@@ -3,7 +3,7 @@ import db from "../db.js";
 import path from "path";
 import getGradeAndPoints from "../utils/getGradeAndPoints.js";
 import homeworkUpload from "../homeworkUpload.js";
-import { lessonNoteDocumentHtml, lessonNoteFilename } from "../utils/lessonNoteDocument.js";
+import { lessonNoteDocumentHtml, lessonNoteFilename, lessonNoteContentHtml } from "../utils/lessonNoteDocument.js";
 
 function isAuthenticated(req, res, next) {
   if (req.isAuthenticated && req.isAuthenticated()) {
@@ -211,6 +211,169 @@ export default function registerExamRoutes(app) {
     });
   });
 
+  app.get('/exams/notes', isAuthenticated, isTeacher, async (req, res) => {
+    const grade = String(req.query.grade || '').trim();
+    const selectedTerm = ["1", "2", "3"].includes(req.query.term) ? req.query.term : "1";
+    if (!/^[1-9]$/.test(grade)) return res.redirect('/exams');
+
+    const [subjectResult, notesResult] = await Promise.all([
+      db.query(
+        `SELECT DISTINCT ON (COALESCE(NULLIF(BTRIM(subject_code), ''), name))
+                name, COALESCE(NULLIF(BTRIM(subject_code), ''), name) AS subject_code
+         FROM subjects
+         WHERE name IS NOT NULL AND BTRIM(name) <> ''
+         ORDER BY COALESCE(NULLIF(BTRIM(subject_code), ''), name), id ASC`
+      ),
+      db.query(
+        `SELECT id, subject_code, subject_name, content, week_no, lesson_no, strand, sub_strand, updated_at
+         FROM teacher_notes
+         WHERE teacher_id = $1 AND grade = $2 AND term = $3
+         ORDER BY subject_name, week_no NULLS LAST, lesson_no NULLS LAST, created_at, id`,
+        [req.user.id, grade, selectedTerm]
+      ),
+    ]);
+    const selectedSubjectCode = String(req.query.subject_code || '');
+    const selectedArea = subjectResult.rows.find(area => area.subject_code === selectedSubjectCode) || null;
+    const notes = selectedArea ? notesResult.rows.filter(note => note.subject_code === selectedSubjectCode) : [];
+    const formatNote = note => {
+      let editorContent;
+      try {
+        editorContent = JSON.parse(note.content);
+      } catch {
+        editorContent = { ops: [{ insert: `${note.content}\n` }] };
+      }
+      const hasDelta = editorContent && Array.isArray(editorContent.ops);
+      const plainContent = hasDelta
+        ? editorContent.ops.map(operation => typeof operation.insert === 'string' ? operation.insert : '').join('').trim()
+        : String(note.content || '').trim();
+      const characters = Array.from(plainContent);
+      return {
+        ...note,
+        editorContent: hasDelta ? editorContent : { ops: [{ insert: `${note.content}\n` }] },
+        previewText: characters.length > 20 ? `${characters.slice(0, 20).join('')}...` : plainContent,
+      };
+    };
+    const formattedNotes = notes.map(formatNote);
+    const editNote = formattedNotes.find(note => String(note.id) === String(req.query.edit_id)) || null;
+
+    res.render('examNotes.ejs', {
+      selectedGrade: grade,
+      selectedTerm,
+      learningAreas: subjectResult.rows,
+      selectedSubjectCode: selectedArea ? selectedSubjectCode : '',
+      selectedArea,
+      notes: formattedNotes,
+      editNote: editNote && editNote.subject_code === selectedSubjectCode ? editNote : null,
+      saved: req.query.saved === '1',
+      updated: req.query.updated === '1',
+      deleted: req.query.deleted === '1',
+      invalid: req.query.invalid === '1',
+    });
+  });
+
+  app.post('/exams/notes', isAuthenticated, isTeacher, async (req, res) => {
+    const grade = String(req.body.grade || '').trim();
+    const selectedTerm = String(req.body.term || '');
+    const subjectCode = String(req.body.subject_code || '').trim();
+    const content = String(req.body.content || '').trim();
+    const weekNo = Number(req.body.week_no);
+    const lessonNo = Number(req.body.lesson_no);
+    const strand = String(req.body.strand || '').trim();
+    const subStrand = String(req.body.sub_strand || '').trim();
+    const noteId = String(req.body.note_id || '').trim();
+    const pageUrl = `/exams/notes?grade=${encodeURIComponent(grade)}&term=${encodeURIComponent(selectedTerm)}&subject_code=${encodeURIComponent(subjectCode)}`;
+    const editQuery = noteId ? `&edit_id=${encodeURIComponent(noteId)}` : '';
+
+    if (!/^[1-9]$/.test(grade) || !["1", "2", "3"].includes(selectedTerm)) return res.redirect('/exams');
+    if (!subjectCode || !Number.isInteger(weekNo) || weekNo < 1 || !Number.isInteger(lessonNo) || lessonNo < 1 || !strand || strand.length > 255 || !subStrand || subStrand.length > 255 || !content || content.length > 100000) {
+      return res.redirect(`${pageUrl}${editQuery}&invalid=1`);
+    }
+
+    let parsedContent;
+    try {
+      parsedContent = JSON.parse(content);
+    } catch {
+      return res.redirect(`${pageUrl}${editQuery}&invalid=1`);
+    }
+    if (!parsedContent || !Array.isArray(parsedContent.ops)) {
+      return res.redirect(`${pageUrl}${editQuery}&invalid=1`);
+    }
+
+    const subjectResult = await db.query(
+      `SELECT name, COALESCE(NULLIF(BTRIM(subject_code), ''), name) AS subject_code
+       FROM subjects
+       WHERE COALESCE(NULLIF(BTRIM(subject_code), ''), name) = $1
+       ORDER BY id ASC
+       LIMIT 1`,
+      [subjectCode]
+    );
+    const subject = subjectResult.rows[0];
+    if (!subject) return res.redirect('/exams');
+
+    const title = `Week ${weekNo} Lesson ${lessonNo}`;
+    if (noteId) {
+      if (!/^\d+$/.test(noteId)) return res.redirect(`${pageUrl}&invalid=1`);
+      const result = await db.query(
+        `UPDATE teacher_notes
+         SET subject_code = $1, subject_name = $2, title = $3, content = $4,
+             week_no = $5, lesson_no = $6, strand = $7, sub_strand = $8, updated_at = now()
+         WHERE id = $9 AND teacher_id = $10 AND grade = $11 AND term = $12
+         RETURNING id`,
+        [subject.subject_code, subject.name, title, JSON.stringify(parsedContent), weekNo, lessonNo, strand, subStrand, noteId, req.user.id, grade, selectedTerm]
+      );
+      if (!result.rowCount) return res.status(404).send('Note not found.');
+      return res.redirect(`${pageUrl}&updated=1`);
+    }
+
+    await db.query(
+      `INSERT INTO teacher_notes (
+         teacher_id, grade, term, subject_code, subject_name, title, content, week_no, lesson_no, strand, sub_strand
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+      [req.user.id, grade, selectedTerm, subject.subject_code, subject.name, title, JSON.stringify(parsedContent), weekNo, lessonNo, strand, subStrand]
+    );
+    res.redirect(`${pageUrl}&saved=1`);
+  });
+
+  app.post('/exams/notes/:id/delete', isAuthenticated, isTeacher, async (req, res) => {
+    if (!/^\d+$/.test(String(req.params.id))) return res.status(404).send('Note not found.');
+    const result = await db.query(
+      `DELETE FROM teacher_notes
+       WHERE id = $1 AND teacher_id = $2
+       RETURNING grade, term, subject_code`,
+      [req.params.id, req.user.id]
+    );
+    const note = result.rows[0];
+    if (!note) return res.status(404).send('Note not found.');
+    const pageUrl = `/exams/notes?grade=${encodeURIComponent(note.grade)}&term=${encodeURIComponent(note.term)}&subject_code=${encodeURIComponent(note.subject_code)}`;
+    res.redirect(`${pageUrl}&deleted=1`);
+  });
+
+  app.get('/exams/notes/:id/download', isAuthenticated, isTeacher, async (req, res) => {
+    if (!/^\d+$/.test(String(req.params.id))) return res.status(404).send('Note not found.');
+    const result = await db.query(
+      `SELECT id, grade, term, subject_name, content, week_no, lesson_no, strand, sub_strand
+       FROM teacher_notes
+       WHERE id = $1 AND teacher_id = $2`,
+      [req.params.id, req.user.id]
+    );
+    const note = result.rows[0];
+    if (!note) return res.status(404).send('Note not found.');
+
+    const subjectSlug = String(note.subject_name || 'learning-area')
+      .replace(/[^a-z0-9]+/gi, '-')
+      .replace(/^-|-$/g, '')
+      .toLowerCase();
+    res.setHeader('Content-Type', 'application/msword; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="notes-grade-${note.grade}-${subjectSlug}-term-${note.term}.doc"`);
+    res.send(`<!doctype html>
+<html><head><meta charset="utf-8"><title>${escapeHtml(note.subject_name)} Notes</title>
+<style>body{font-family:Calibri,Arial,sans-serif;line-height:1.5;margin:2cm;color:#222}h1{font-size:22pt}h2{font-size:16pt}</style>
+</head><body><h1>${escapeHtml(note.subject_name)} Notes</h1>
+<p><strong>Grade:</strong> ${escapeHtml(note.grade)} &nbsp; <strong>Term:</strong> ${escapeHtml(note.term)} &nbsp; <strong>Week:</strong> ${escapeHtml(note.week_no)} &nbsp; <strong>Lesson:</strong> ${escapeHtml(note.lesson_no)}</p>
+<p><strong>Strand:</strong> ${escapeHtml(note.strand)}<br><strong>Sub-strand:</strong> ${escapeHtml(note.sub_strand)}</p>
+<hr>${lessonNoteContentHtml(note.content)}</body></html>`);
+  });
+
   app.get('/exams/learning-areas', isAuthenticated, isTeacher, async (req, res) => {
     const grade = String(req.query.grade || '').trim();
     const selectedTerm = ["1", "2", "3"].includes(req.query.term) ? req.query.term : "1";
@@ -229,13 +392,15 @@ export default function registerExamRoutes(app) {
     const selectedArea = result.rows.find(area => area.subject_code === selectedSubjectCode) || null;
     const noteResult = selectedArea
       ? await db.query(
-        `SELECT id, strand, sub_strand, week_no, lesson_no, lesson_content
+        `SELECT id, strand, sub_strand, week_no, lesson_no, lesson_content,
+                school_name, roll, TO_CHAR(lesson_time, 'HH24:MI') AS lesson_time
          FROM lesson_notes
          WHERE teacher_id = $1 AND grade = $2 AND term = $3 AND subject_code = $4
          ORDER BY lesson_no, created_at, id`,
         [req.user.id, grade, selectedTerm, selectedSubjectCode]
       )
       : { rows: [] };
+    const editNote = noteResult.rows.find(note => String(note.id) === String(req.query.edit_id)) || null;
 
     res.render('examLearningAreas.ejs', {
       selectedGrade: grade,
@@ -244,7 +409,10 @@ export default function registerExamRoutes(app) {
       selectedSubjectCode: selectedArea ? selectedSubjectCode : '',
       selectedArea,
       lessonNotes: noteResult.rows,
+      editNote,
       saved: req.query.saved === '1',
+      updated: req.query.updated === '1',
+      deleted: req.query.deleted === '1',
       invalid: req.query.invalid === '1',
     });
   });
@@ -253,28 +421,33 @@ export default function registerExamRoutes(app) {
     const grade = String(req.body.grade || '').trim();
     const selectedTerm = String(req.body.term || '');
     const subjectCode = String(req.body.subject_code || '').trim();
+    const schoolName = String(req.body.school_name || '').trim();
+    const roll = String(req.body.roll || '').trim();
+    const lessonTime = String(req.body.lesson_time || '').trim();
     const strand = String(req.body.strand || '').trim();
     const subStrand = String(req.body.sub_strand || '').trim();
     const weekNo = Number(req.body.week_no);
     const lessonNo = Number(req.body.lesson_no);
     const lessonContent = String(req.body.lesson_content || '');
+    const lessonNoteId = String(req.body.lesson_note_id || '').trim();
     const pageUrl = `/exams/learning-areas?grade=${encodeURIComponent(grade)}&term=${encodeURIComponent(selectedTerm)}&subject_code=${encodeURIComponent(subjectCode)}`;
+    const editQuery = lessonNoteId ? `&edit_id=${encodeURIComponent(lessonNoteId)}` : '';
 
     if (!/^[1-9]$/.test(grade) || !["1", "2", "3"].includes(selectedTerm)) {
       return res.redirect('/exams');
     }
-    if (!subjectCode || !strand || !subStrand || !Number.isInteger(weekNo) || weekNo < 1 || !Number.isInteger(lessonNo) || lessonNo < 1 || lessonContent.length > 100000) {
-      return res.redirect(`${pageUrl}&invalid=1`);
+    if (!subjectCode || !schoolName || schoolName.length > 150 || !roll || roll.length > 50 || !/^([01]\d|2[0-3]):[0-5]\d$/.test(lessonTime) || !strand || !subStrand || !Number.isInteger(weekNo) || weekNo < 1 || !Number.isInteger(lessonNo) || lessonNo < 1 || lessonContent.length > 100000) {
+      return res.redirect(`${pageUrl}${editQuery}&invalid=1`);
     }
 
     let parsedContent;
     try {
       parsedContent = JSON.parse(lessonContent);
     } catch {
-      return res.redirect(`${pageUrl}&invalid=1`);
+      return res.redirect(`${pageUrl}${editQuery}&invalid=1`);
     }
     if (!parsedContent || !Array.isArray(parsedContent.ops)) {
-      return res.redirect(`${pageUrl}&invalid=1`);
+      return res.redirect(`${pageUrl}${editQuery}&invalid=1`);
     }
 
     const subjectResult = await db.query(
@@ -290,21 +463,52 @@ export default function registerExamRoutes(app) {
       return res.redirect('/exams');
     }
 
+    if (lessonNoteId) {
+      if (!/^\d+$/.test(lessonNoteId)) return res.redirect(`${pageUrl}&invalid=1`);
+      const updateResult = await db.query(
+        `UPDATE lesson_notes
+         SET subject_code = $1, subject_name = $2, strand = $3, sub_strand = $4,
+             week_no = $5, lesson_no = $6, lesson_content = $7, school_name = $8,
+             roll = $9, lesson_time = $10, updated_at = now()
+         WHERE id = $11 AND teacher_id = $12 AND grade = $13 AND term = $14
+         RETURNING id`,
+        [subject.subject_code, subject.name, strand, subStrand, weekNo, lessonNo, JSON.stringify(parsedContent), schoolName, roll, lessonTime, lessonNoteId, req.user.id, grade, selectedTerm]
+      );
+      if (!updateResult.rowCount) return res.status(404).send('Lesson plan not found.');
+      return res.redirect(`${pageUrl}&updated=1`);
+    }
+
     await db.query(
       `INSERT INTO lesson_notes (
         teacher_id, grade, term, subject_code, subject_name,
-        strand, sub_strand, week_no, lesson_no, lesson_content
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        strand, sub_strand, week_no, lesson_no, lesson_content,
+        school_name, roll, lesson_time
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       RETURNING id`,
-      [req.user.id, grade, selectedTerm, subject.subject_code, subject.name, strand, subStrand, weekNo, lessonNo, JSON.stringify(parsedContent)]
+      [req.user.id, grade, selectedTerm, subject.subject_code, subject.name, strand, subStrand, weekNo, lessonNo, JSON.stringify(parsedContent), schoolName, roll, lessonTime]
     );
 
     res.redirect(`${pageUrl}&saved=1`);
   });
 
+  app.post('/exams/lesson-notes/:id/delete', isAuthenticated, isTeacher, async (req, res) => {
+    if (!/^\d+$/.test(String(req.params.id))) return res.status(404).send('Lesson plan not found.');
+    const result = await db.query(
+      `DELETE FROM lesson_notes
+       WHERE id = $1 AND teacher_id = $2
+       RETURNING grade, term, subject_code`,
+      [req.params.id, req.user.id]
+    );
+    const note = result.rows[0];
+    if (!note) return res.status(404).send('Lesson plan not found.');
+    const pageUrl = `/exams/learning-areas?grade=${encodeURIComponent(note.grade)}&term=${encodeURIComponent(note.term)}&subject_code=${encodeURIComponent(note.subject_code)}`;
+    res.redirect(`${pageUrl}&deleted=1`);
+  });
+
   app.get('/exams/lesson-notes/:id/download', isAuthenticated, isTeacher, async (req, res) => {
     const result = await db.query(
-      `SELECT id, grade, term, subject_name, strand, sub_strand, week_no, lesson_no, lesson_content
+      `SELECT id, grade, term, subject_name, strand, sub_strand, week_no, lesson_no, lesson_content,
+              school_name, roll, TO_CHAR(lesson_time, 'HH24:MI') AS lesson_time
        FROM lesson_notes
        WHERE id = $1 AND teacher_id = $2`,
       [req.params.id, req.user.id]
@@ -2034,6 +2238,3 @@ export default function registerExamRoutes(app) {
     }
   });
 }
-
-
-

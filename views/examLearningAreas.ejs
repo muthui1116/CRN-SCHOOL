@@ -2,12 +2,17 @@
 
 <link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet">
 
+<% const learningAreaLabel = name => {
+  const label = String(name).trim();
+  return /\slesson plan$/i.test(label) ? label : `${label} Lesson Plan`;
+}; %>
+
 <main class="container py-4 py-md-5">
   <div class="mb-4">
     <a href="/exams?grade=<%= selectedGrade %>&term=<%= selectedTerm %>" class="btn btn-sm btn-outline-secondary mb-3">
       <i class="fas fa-arrow-left me-1"></i>Back to results
     </a>
-    <h1 class="h4 mb-1">Notes Grade <%= selectedGrade %></h1>
+    <h1 class="h4 mb-1">Lesson Plan Grade <%= selectedGrade %></h1>
     <p class="text-muted mb-0">Term <%= selectedTerm %></p>
   </div>
 
@@ -19,26 +24,32 @@
       <select id="learningAreaSelect" name="subject_code" class="form-select" aria-label="Learning area" onchange="this.form.submit()">
         <option value="">Choose a learning area</option>
         <% learningAreas.forEach(area => { %>
-          <option value="<%= area.subject_code %>" <%= selectedSubjectCode === area.subject_code ? 'selected' : '' %>><%= area.name %></option>
+          <option value="<%= area.subject_code %>" <%= selectedSubjectCode === area.subject_code ? 'selected' : '' %>><%= learningAreaLabel(area.name) %></option>
         <% }); %>
       </select>
     </form>
 
     <% if (saved) { %>
-      <div class="alert alert-success py-2" role="status">Lesson notes saved.</div>
+      <div class="alert alert-success py-2" role="status">Lesson plan saved.</div>
+    <% } %>
+    <% if (updated) { %>
+      <div class="alert alert-success py-2" role="status">Lesson plan updated.</div>
+    <% } %>
+    <% if (deleted) { %>
+      <div class="alert alert-success py-2" role="status">Lesson plan deleted.</div>
     <% } %>
     <% if (invalid) { %>
-      <div class="alert alert-danger py-2" role="alert">Complete all fields with valid values before saving.</div>
+      <div class="alert alert-danger py-2" role="alert">Complete all lesson plan fields with valid values before saving.</div>
     <% } %>
 
     <% if (selectedArea) { %>
       <% if (lessonNotes.length) { %>
         <div class="mb-4">
-          <h3 class="h6 fw-semibold mb-3">Saved lessons</h3>
+          <h3 class="h6 fw-semibold mb-3">Saved lesson plans</h3>
           <div class="table-responsive">
             <table class="table table-sm table-bordered align-middle mb-0">
               <thead class="table-light">
-                <tr><th>Week</th><th>Lesson</th><th>Strand</th><th>Sub-Strand</th><th class="text-end">Download</th></tr>
+                <tr><th>Week</th><th>Lesson</th><th>Strand</th><th>Sub-Strand</th><th>Name</th><th>Roll</th><th>Time</th><th class="text-end">Actions</th></tr>
               </thead>
               <tbody>
                 <% lessonNotes.forEach(note => { %>
@@ -47,10 +58,17 @@
                     <td><%= note.lesson_no %></td>
                     <td><%= note.strand %></td>
                     <td><%= note.sub_strand %></td>
+                    <td><%= note.school_name || '—' %></td>
+                    <td><%= note.roll || '—' %></td>
+                    <td><%= note.lesson_time || '—' %></td>
                     <td class="text-end">
+                      <a href="/exams/learning-areas?grade=<%= selectedGrade %>&term=<%= selectedTerm %>&subject_code=<%= encodeURIComponent(selectedSubjectCode) %>&edit_id=<%= note.id %>" class="btn btn-sm btn-outline-primary">Edit</a>
                       <a href="/exams/lesson-notes/<%= note.id %>/download" class="btn btn-sm btn-outline-secondary" aria-label="Download week <%= note.week_no %> lesson <%= note.lesson_no %>">
                         <i class="fas fa-download me-1"></i>Download
                       </a>
+                      <form action="/exams/lesson-notes/<%= note.id %>/delete" method="POST" class="d-inline" onsubmit="return confirm('Delete this lesson plan?')">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                      </form>
                     </td>
                   </tr>
                 <% }); %>
@@ -64,32 +82,47 @@
         <input type="hidden" name="grade" value="<%= selectedGrade %>">
         <input type="hidden" name="term" value="<%= selectedTerm %>">
         <input type="hidden" name="subject_code" value="<%= selectedSubjectCode %>">
+        <% if (editNote) { %>
+          <input type="hidden" name="lesson_note_id" value="<%= editNote.id %>">
+        <% } %>
         <input type="hidden" name="lesson_content" id="lessonContentInput">
 
         <div class="mb-3">
-          <h3 class="h5 mb-0"><%= selectedArea.name %></h3>
+          <h3 class="h5 mb-0"><%= editNote ? 'Edit lesson plan' : learningAreaLabel(selectedArea.name) %></h3>
         </div>
 
         <div class="row g-3 mb-4">
+          <div class="col-12 col-md-4">
+            <label for="schoolName" class="form-label">Name</label>
+            <input id="schoolName" name="school_name" class="form-control" maxlength="150" value="<%= editNote ? editNote.school_name : '' %>" required>
+          </div>
+          <div class="col-12 col-md-4">
+            <label for="roll" class="form-label">Roll</label>
+            <input id="roll" name="roll" class="form-control" maxlength="50" value="<%= editNote ? editNote.roll : '' %>" required>
+          </div>
+          <div class="col-12 col-md-4">
+            <label for="lessonTime" class="form-label">Time</label>
+            <input id="lessonTime" name="lesson_time" type="time" class="form-control" value="<%= editNote ? editNote.lesson_time : '' %>" required>
+          </div>
           <div class="col-12 col-md-3">
             <label for="strand" class="form-label">Strand</label>
-            <input id="strand" name="strand" class="form-control" required>
+            <input id="strand" name="strand" class="form-control" value="<%= editNote ? editNote.strand : '' %>" required>
           </div>
           <div class="col-12 col-md-3">
             <label for="subStrand" class="form-label">Sub-Strand</label>
-            <input id="subStrand" name="sub_strand" class="form-control" required>
+            <input id="subStrand" name="sub_strand" class="form-control" value="<%= editNote ? editNote.sub_strand : '' %>" required>
           </div>
           <div class="col-12 col-md-3">
             <label for="weekNo" class="form-label">Week</label>
-            <input id="weekNo" name="week_no" type="number" min="1" step="1" class="form-control" required>
+            <input id="weekNo" name="week_no" type="number" min="1" step="1" class="form-control" value="<%= editNote ? editNote.week_no : '' %>" required>
           </div>
           <div class="col-12 col-md-3">
             <label for="lessonNo" class="form-label">Lesson No.</label>
-            <input id="lessonNo" name="lesson_no" type="number" min="1" step="1" class="form-control" required>
+            <input id="lessonNo" name="lesson_no" type="number" min="1" step="1" class="form-control" value="<%= editNote ? editNote.lesson_no : '' %>" required>
           </div>
         </div>
 
-        <label class="form-label" for="editor">Lesson Notes</label>
+        <label class="form-label" for="editor">Lesson Plan</label>
         <div id="toolbar" aria-label="Text formatting toolbar">
           <span class="ql-formats">
             <select class="ql-font"></select>
@@ -119,10 +152,13 @@
             <button class="ql-link"></button><button class="ql-image"></button><button class="ql-clean"></button>
           </span>
         </div>
-        <div id="editor" class="bg-white" data-content="<%= JSON.stringify({ ops: [] }) %>"></div>
+        <div id="editor" class="bg-white" data-content="<%= JSON.stringify(editNote ? JSON.parse(editNote.lesson_content) : { ops: [] }) %>"></div>
 
         <div class="d-flex justify-content-end mt-3">
-          <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Save lesson notes</button>
+          <% if (editNote) { %>
+            <a href="/exams/learning-areas?grade=<%= selectedGrade %>&term=<%= selectedTerm %>&subject_code=<%= encodeURIComponent(selectedSubjectCode) %>" class="btn btn-outline-secondary me-2">Cancel</a>
+          <% } %>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i><%= editNote ? 'Update lesson plan' : 'Save lesson plan' %></button>
         </div>
       </form>
     <% } %>
@@ -136,7 +172,7 @@
     const editor = new Quill(editorElement, {
       theme: 'snow',
       modules: { toolbar: '#toolbar' },
-      placeholder: 'Write lesson notes...'
+      placeholder: 'Write lesson plan...'
     });
 
     try {

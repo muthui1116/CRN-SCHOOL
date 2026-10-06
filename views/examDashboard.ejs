@@ -32,10 +32,19 @@
         <form class="row g-2">
           <div class="col-12">
             <label for="gradeSelectMobile" class="form-label small text-muted mb-1">Select Grade</label>
-            <select id="gradeSelectMobile" class="form-select form-select-sm" onchange="if(this.value) window.location.href='/exams/learning-areas?grade=' + this.value + '&term=<%= selectedTerm %>'">
+            <select id="gradeSelectMobile" class="form-select form-select-sm" onchange="if(this.value) window.location.href='/exams/notes?grade=' + this.value + '&term=<%= selectedTerm %>'">
               <option value="" <%= !selectedGrade ? 'selected' : '' %>>Choose grade</option>
               <% for (let g = 1; g <= 9; g++) { %>
                 <option value="<%= g %>" <%= Number(selectedGrade) === g ? 'selected' : '' %>>Notes Grade <%= g %></option>
+              <% } %>
+            </select>
+          </div>
+          <div class="col-12">
+            <label for="lessonPlanGradeSelectMobile" class="form-label small text-muted mb-1">Lesson Plan</label>
+            <select id="lessonPlanGradeSelectMobile" class="form-select form-select-sm" onchange="if(this.value) window.location.href='/exams/learning-areas?grade=' + this.value + '&term=<%= selectedTerm %>'">
+              <option value="" <%= !selectedGrade ? 'selected' : '' %>>Choose lesson plan grade</option>
+              <% for (let g = 1; g <= 9; g++) { %>
+                <option value="<%= g %>" <%= Number(selectedGrade) === g ? 'selected' : '' %>>Lesson Plan Grade <%= g %></option>
               <% } %>
             </select>
           </div>
@@ -69,7 +78,19 @@
                   </button>
                   <ul class="dropdown-menu" aria-labelledby="gradeDropdown">
                     <% for (let g = 1; g <= 9; g++) { %>
-                      <li><a class="dropdown-item <%= Number(selectedGrade) === g ? 'active' : '' %>" href="/exams/learning-areas?grade=<%= g %>&term=<%= selectedTerm %>">Notes Grade <%= g %></a></li>
+                      <li><a class="dropdown-item <%= Number(selectedGrade) === g ? 'active' : '' %>" href="/exams/notes?grade=<%= g %>&term=<%= selectedTerm %>">Notes Grade <%= g %></a></li>
+                    <% } %>
+                  </ul>
+                </div>
+              </div>
+              <div class="col-12 col-sm-6 col-lg-auto">
+                <div class="dropdown">
+                  <button class="btn btn-sm btn-outline-primary dropdown-toggle w-100 w-lg-auto" type="button" id="lessonPlanGradeDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                    Lesson Plan Grade <%= selectedGrade %>
+                  </button>
+                  <ul class="dropdown-menu" aria-labelledby="lessonPlanGradeDropdown">
+                    <% for (let g = 1; g <= 9; g++) { %>
+                      <li><a class="dropdown-item <%= Number(selectedGrade) === g ? 'active' : '' %>" href="/exams/learning-areas?grade=<%= g %>&term=<%= selectedTerm %>">Lesson Plan Grade <%= g %></a></li>
                     <% } %>
                   </ul>
                 </div>
@@ -563,5 +584,3 @@
 </script>
 
 <%- include('partials/footer') %>
-
-

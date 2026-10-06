@@ -1,0 +1,190 @@
+<%- include('partials/header') %>
+
+<link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet">
+
+<% const notesAreaLabel = name => {
+  const label = String(name).trim();
+  return /\snotes$/i.test(label) ? label : `${label} Notes`;
+}; %>
+
+<main class="container py-4 py-md-5">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+      <a href="/exams?grade=<%= selectedGrade %>&term=<%= selectedTerm %>" class="btn btn-sm btn-outline-secondary mb-3">
+        <i class="fas fa-arrow-left me-1"></i>Back to exam results
+      </a>
+      <h1 class="h4 mb-1">Notes Grade <%= selectedGrade %></h1>
+      <p class="text-muted mb-0">Term <%= selectedTerm %></p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      <div class="dropdown">
+        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="notesGradeDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+          Notes Grade <%= selectedGrade %>
+        </button>
+        <ul class="dropdown-menu" aria-labelledby="notesGradeDropdown">
+          <% for (let g = 1; g <= 9; g++) { %>
+            <li><a class="dropdown-item <%= Number(selectedGrade) === g ? 'active' : '' %>" href="/exams/notes?grade=<%= g %>&term=<%= selectedTerm %>">Notes Grade <%= g %></a></li>
+          <% } %>
+        </ul>
+      </div>
+      <a href="/exams/learning-areas?grade=<%= selectedGrade %>&term=<%= selectedTerm %>" class="btn btn-sm btn-outline-primary">Lesson Plan Grade <%= selectedGrade %></a>
+      <div class="dropdown">
+        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="notesTermDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+          Term <%= selectedTerm %>
+        </button>
+        <ul class="dropdown-menu" aria-labelledby="notesTermDropdown">
+          <% for (let term = 1; term <= 3; term++) { %>
+            <li><a class="dropdown-item <%= selectedTerm === String(term) ? 'active' : '' %>" href="/exams/notes?grade=<%= selectedGrade %>&term=<%= term %><%= selectedSubjectCode ? '&subject_code=' + encodeURIComponent(selectedSubjectCode) : '' %>">Term <%= term %></a></li>
+          <% } %>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <section class="bg-white border rounded p-3 p-md-4" aria-labelledby="notesHeading">
+    <h2 id="notesHeading" class="h6 fw-semibold mb-3">Select a learning area</h2>
+    <form method="GET" action="/exams/notes" class="mb-4">
+      <input type="hidden" name="grade" value="<%= selectedGrade %>">
+      <input type="hidden" name="term" value="<%= selectedTerm %>">
+      <select id="notesSubjectSelect" name="subject_code" class="form-select" aria-label="Learning area" onchange="this.form.submit()">
+        <option value="">Choose a learning area</option>
+        <% learningAreas.forEach(area => { %>
+          <option value="<%= area.subject_code %>" <%= selectedSubjectCode === area.subject_code ? 'selected' : '' %>><%= notesAreaLabel(area.name) %></option>
+        <% }); %>
+      </select>
+    </form>
+
+    <% if (saved) { %>
+      <div class="alert alert-success py-2" role="status">Note saved.</div>
+    <% } %>
+    <% if (updated) { %>
+      <div class="alert alert-success py-2" role="status">Note updated.</div>
+    <% } %>
+    <% if (deleted) { %>
+      <div class="alert alert-success py-2" role="status">Note deleted.</div>
+    <% } %>
+    <% if (invalid) { %>
+      <div class="alert alert-danger py-2" role="alert">Complete all note fields with valid values before saving.</div>
+    <% } %>
+
+    <% if (selectedArea) { %>
+      <% if (notes.length) { %>
+        <div class="mb-4">
+          <h3 class="h6 fw-semibold mb-3">Saved notes for <%= notesAreaLabel(selectedArea.name) %></h3>
+          <div class="table-responsive">
+            <table class="table table-sm table-bordered align-middle">
+              <thead class="table-light">
+                <tr><th>Week</th><th>Lesson</th><th>Strand</th><th>Sub-strand</th><th>Note</th><th class="text-center">Actions</th></tr>
+              </thead>
+              <tbody>
+                <% notes.forEach(note => { %>
+                  <tr>
+                    <td><%= note.week_no || '—' %></td>
+                    <td><%= note.lesson_no || '—' %></td>
+                    <td><%= note.strand || '—' %></td>
+                    <td><%= note.sub_strand || '—' %></td>
+                    <td><div class="text-break" title="<%= note.previewText %>"><%= note.previewText %></div></td>
+                    <td class="text-center text-nowrap">
+                      <a href="/exams/notes/<%= note.id %>/download" class="btn btn-sm btn-outline-secondary" aria-label="Download week <%= note.week_no %> lesson <%= note.lesson_no %>">
+                        <i class="fas fa-download me-1"></i>Download
+                      </a>
+                      <a href="/exams/notes?grade=<%= selectedGrade %>&term=<%= selectedTerm %>&subject_code=<%= encodeURIComponent(selectedSubjectCode) %>&edit_id=<%= note.id %>" class="btn btn-sm btn-outline-primary">Edit</a>
+                      <form action="/exams/notes/<%= note.id %>/delete" method="POST" class="d-inline" onsubmit="return confirm('Delete this note?')">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                      </form>
+                    </td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      <% } %>
+
+      <form action="/exams/notes" method="POST" id="teacherNoteForm">
+        <input type="hidden" name="grade" value="<%= selectedGrade %>">
+        <input type="hidden" name="term" value="<%= selectedTerm %>">
+        <input type="hidden" name="subject_code" value="<%= selectedSubjectCode %>">
+        <% if (editNote) { %>
+          <input type="hidden" name="note_id" value="<%= editNote.id %>">
+        <% } %>
+        <div class="row g-3 mb-3">
+          <div class="col-6 col-md-3">
+            <label for="weekNo" class="form-label">Week</label>
+            <input id="weekNo" name="week_no" type="number" min="1" step="1" class="form-control" value="<%= editNote ? editNote.week_no : '' %>" required>
+          </div>
+          <div class="col-6 col-md-3">
+            <label for="lessonNo" class="form-label">Lesson</label>
+            <input id="lessonNo" name="lesson_no" type="number" min="1" step="1" class="form-control" value="<%= editNote ? editNote.lesson_no : '' %>" required>
+          </div>
+          <div class="col-12 col-md-3">
+            <label for="strand" class="form-label">Strand</label>
+            <input id="strand" name="strand" maxlength="255" class="form-control" value="<%= editNote ? editNote.strand : '' %>" required>
+          </div>
+          <div class="col-12 col-md-3">
+            <label for="subStrand" class="form-label">Sub-strand</label>
+            <input id="subStrand" name="sub_strand" maxlength="255" class="form-control" value="<%= editNote ? editNote.sub_strand : '' %>" required>
+          </div>
+        </div>
+        <label class="form-label" for="noteEditor">Notes</label>
+        <input type="hidden" id="noteContent" name="content">
+        <div id="noteToolbar" aria-label="Text formatting toolbar">
+          <span class="ql-formats">
+            <select class="ql-font"></select>
+            <select class="ql-size"></select>
+          </span>
+          <span class="ql-formats">
+            <button class="ql-bold"></button><button class="ql-italic"></button><button class="ql-underline"></button><button class="ql-strike"></button>
+          </span>
+          <span class="ql-formats">
+            <select class="ql-color"></select><select class="ql-background"></select>
+            <button class="ql-script" value="sub"></button><button class="ql-script" value="super"></button>
+          </span>
+          <span class="ql-formats">
+            <select class="ql-header">
+              <option value="1"></option><option value="2"></option><option value="3"></option><option selected></option>
+            </select>
+            <button class="ql-blockquote"></button>
+          </span>
+          <span class="ql-formats">
+            <button class="ql-list" value="ordered"></button><button class="ql-list" value="bullet"></button>
+            <button class="ql-indent" value="-1"></button><button class="ql-indent" value="+1"></button>
+          </span>
+          <span class="ql-formats">
+            <select class="ql-align"></select>
+            <button class="ql-link"></button><button class="ql-clean"></button>
+          </span>
+        </div>
+        <div id="noteEditor" class="bg-white" data-content="<%= JSON.stringify(editNote ? editNote.editorContent : { ops: [] }) %>"></div>
+        <% if (editNote) { %>
+          <a href="/exams/notes?grade=<%= selectedGrade %>&term=<%= selectedTerm %>&subject_code=<%= encodeURIComponent(selectedSubjectCode) %>" class="btn btn-outline-secondary">Cancel</a>
+        <% } %>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i><%= editNote ? 'Update note' : 'Save note' %></button>
+      </form>
+    <% } %>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
+<script>
+  const noteEditorElement = document.getElementById('noteEditor');
+  if (noteEditorElement) {
+    const noteEditor = new Quill(noteEditorElement, {
+      theme: 'snow',
+      modules: { toolbar: '#noteToolbar' },
+      placeholder: 'Write notes...'
+    });
+
+    try {
+      noteEditor.setContents(JSON.parse(noteEditorElement.dataset.content));
+    } catch {
+      noteEditor.setText('');
+    }
+
+    document.getElementById('teacherNoteForm').addEventListener('submit', () => {
+      document.getElementById('noteContent').value = JSON.stringify(noteEditor.getContents());
+    });
+  }
+</script>
+
+<%- include('partials/footer') %>

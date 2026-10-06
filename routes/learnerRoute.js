@@ -302,7 +302,8 @@ export default function registerLearnerRoutes(app) {
       const lessonNotesResult = grade
         ? await db.query(
           `SELECT ln.id, ln.grade, ln.term, ln.subject_name, ln.strand, ln.sub_strand,
-                  ln.week_no, ln.lesson_no, ln.lesson_content, ln.updated_at, u.name AS teacher_name
+                  ln.week_no, ln.lesson_no, ln.lesson_content, ln.school_name, ln.roll,
+                  TO_CHAR(ln.lesson_time, 'HH24:MI') AS lesson_time, ln.updated_at, u.name AS teacher_name
            FROM lesson_notes ln
            JOIN users u ON u.id = ln.teacher_id
            WHERE ln.grade = $1 AND ln.term = $2
@@ -358,7 +359,8 @@ export default function registerLearnerRoutes(app) {
       if (!grade) return res.status(404).send("Lesson notes not found.");
 
       const result = await db.query(
-        `SELECT id, grade, term, subject_name, strand, sub_strand, week_no, lesson_no, lesson_content
+        `SELECT id, grade, term, subject_name, strand, sub_strand, week_no, lesson_no, lesson_content,
+                school_name, roll, TO_CHAR(lesson_time, 'HH24:MI') AS lesson_time
          FROM lesson_notes
          WHERE id = $1 AND grade = $2`,
         [req.params.id, grade]
