@@ -601,10 +601,10 @@ export default function registerAdminRoutes(app) {
         const subjectProvided = subjectKeys.some(k => Object.prototype.hasOwnProperty.call(sanitized, k) && sanitized[k] !== '' && sanitized[k] !== undefined);
 
         if (subjectProvided) {
-          const cols = ['learner_id','term'];
-          const placeholders = ['$1','$2'];
-          const vals = [req.params.id, term];
-          let idx = 3;
+          const cols = ['learner_id','term','teacher_id'];
+          const placeholders = ['$1','$2','$3'];
+          const vals = [req.params.id, term, req.user.id];
+          let idx = 4;
           for (const k of subjectKeys) {
             cols.push(k);
             placeholders.push(`$${idx}`);
@@ -612,7 +612,7 @@ export default function registerAdminRoutes(app) {
             idx++;
           }
 
-          const insertSql = `INSERT INTO learner_results (${cols.join(',')}) VALUES (${placeholders.join(',')}) ON CONFLICT (learner_id, term) DO UPDATE SET ${subjectKeys.map(k => `${k}=EXCLUDED.${k}`).join(',')}`;
+          const insertSql = `INSERT INTO learner_results (${cols.join(',')}) VALUES (${placeholders.join(',')}) ON CONFLICT (learner_id, term, teacher_id) DO UPDATE SET ${subjectKeys.map(k => `${k}=EXCLUDED.${k}`).join(',')}`;
           await db.query(insertSql, vals);
         }
 
@@ -917,4 +917,3 @@ export default function registerAdminRoutes(app) {
     },
   );
 }
-

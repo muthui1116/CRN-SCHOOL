@@ -1,8 +1,13 @@
 // routes/examRoute.js
 import db from "../db.js"; 
+import fs from "fs/promises";
 import path from "path";
+import mammoth from "mammoth";
+import { PDFParse } from "pdf-parse";
+import WordExtractor from "word-extractor";
 import getGradeAndPoints from "../utils/getGradeAndPoints.js";
 import homeworkUpload from "../homeworkUpload.js";
+import schemesUpload from "../schemesUpload.js";
 import { lessonNoteDocumentHtml, lessonNoteFilename, lessonNoteContentHtml } from "../utils/lessonNoteDocument.js";
 
 function isAuthenticated(req, res, next) {
@@ -16,8 +21,221 @@ function isTeacher(req, res, next) {
   if (req.isAuthenticated && req.isAuthenticated() && req.user && req.user.role === 2) {
     return next();
   }
-  return res.status(403).send("Access denied. Teacher privileges required.");
+  return res.redirect("/login");
 }
+
+function handleSchemeUpload(req, res, next) {
+  schemesUpload.single('document')(req, res, err => {
+    if (!err) return next();
+    console.error('Scheme upload error:', err);
+    const statusCode = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+    return res.status(statusCode).render('error.ejs', { message: err.message });
+  });
+}
+
+const extractSchemeText = async filePath => {
+  const extension = path.extname(filePath).toLowerCase();
+  if (extension === '.pdf') {
+    const parser = new PDFParse({ data: await fs.readFile(filePath) });
+    try {
+      const result = await parser.getText();
+      return result.text.trim();
+    } finally {
+      await parser.destroy();
+    }
+  }
+  if (extension === '.docx') {
+    const result = await mammoth.extractRawText({ path: filePath });
+    return result.value.trim();
+  }
+  if (extension === '.doc') {
+    const extractor = new WordExtractor();
+    const document = await extractor.extract(filePath);
+    return document.getBody().trim();
+  }
+  throw new Error('Unsupported scheme document format');
+};
+
+const schemeColumns = [
+  { key: 'week', label: 'WK', match: value => /^(wk|week|week no\.?)$/.test(value) },
+  { key: 'lesson', label: 'LSN', match: value => /^(lsn|lesson|lesson no\.?)$/.test(value) },
+  { key: 'strand', label: 'Strand', match: value => value === 'strand' },
+  { key: 'subStrand', label: 'Sub-strand', match: value => value.includes('sub') && value.includes('strand') },
+  { key: 'outcomes', label: 'Specific Learning Outcomes', match: value => value.includes('specific') && value.includes('outcome') },
+  { key: 'experience', label: 'Learning Experience', match: value => (value.includes('learning') || value.includes('leaning')) && value.includes('experience') },
+  { key: 'inquiry', label: 'Key Inquiry Questions', match: value => value.includes('inquiry') && value.includes('question') },
+  { key: 'resources', label: 'Learning Resources', match: value => value.includes('learning') && value.includes('resource') },
+  { key: 'assessment', label: 'Assessment Methods', match: value => value.includes('assessment') && value.includes('method') },
+  { key: 'reflection', label: 'Reflection', match: value => value.includes('reflection') },
+];
+
+const emptySchemeRow = () => Object.fromEntries(schemeColumns.map(column => [column.key, '']));
+
+const decodeSchemeHtml = html => html
+  .replace(/<br\s*\/?>/gi, '\n')
+  .replace(/<\/(?:p|div|li)>/gi, '\n')
+  .replace(/<[^>]*>/g, '')
+  .replace(/&#(\d+);/g, (match, code) => String.fromCodePoint(Number(code)))
+  .replace(/&#x([0-9a-f]+);/gi, (match, code) => String.fromCodePoint(parseInt(code, 16)))
+  .replace(/&nbsp;/gi, ' ')
+  .replace(/&amp;/gi, '&')
+  .replace(/&lt;/gi, '<')
+  .replace(/&gt;/gi, '>')
+  .replace(/&quot;/gi, '"')
+  .replace(/&#39;|&apos;/gi, "'")
+  .replace(/\r/g, '')
+  .trim();
+
+const getTableGrid = tableHtml => {
+  const grid = [];
+  const rows = [...tableHtml.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)];
+  rows.forEach(([, rowHtml], rowIndex) => {
+    grid[rowIndex] ||= [];
+    let columnIndex = 0;
+    const cells = [...rowHtml.matchAll(/<(td|th)\b([^>]*)>([\s\S]*?)<\/\1>/gi)];
+    cells.forEach(([, , attributes, cellHtml]) => {
+      while (grid[rowIndex][columnIndex] !== undefined) columnIndex += 1;
+      const value = decodeSchemeHtml(cellHtml);
+      const colspan = Math.max(1, Number(attributes.match(/\bcolspan=["']?(\d+)/i)?.[1]) || 1);
+      const rowspan = Math.max(1, Number(attributes.match(/\browspan=["']?(\d+)/i)?.[1]) || 1);
+      for (let rowOffset = 0; rowOffset < rowspan; rowOffset += 1) {
+        grid[rowIndex + rowOffset] ||= [];
+        for (let columnOffset = 0; columnOffset < colspan; columnOffset += 1) {
+          grid[rowIndex + rowOffset][columnIndex + columnOffset] = rowOffset === 0 ? value : '';
+        }
+      }
+      columnIndex += colspan;
+    });
+  });
+  return grid;
+};
+
+const parseSchemeDocumentHtml = html => {
+  const tables = [...html.matchAll(/<table\b[\s\S]*?<\/table>/gi)].map(([table]) => table);
+  let school = '';
+  let learningArea = '';
+  let rows = [];
+
+  for (const table of tables) {
+    const grid = getTableGrid(table);
+    const headerIndex = grid.findIndex(row =>
+      row.some(cell => /^(wk|week|week no\.?)$/i.test(String(cell || '').trim())) &&
+      row.some(cell => /^(lsn|lesson|lesson no\.?)$/i.test(String(cell || '').trim()))
+    );
+
+    if (headerIndex < 0) {
+      const labels = grid.findIndex(row =>
+        row.some(cell => /^school$/i.test(String(cell || '').trim())) &&
+        row.some(cell => /^learning area$/i.test(String(cell || '').trim()))
+      );
+      if (labels >= 0) {
+        const values = grid[labels + 1] || [];
+        const schoolIndex = grid[labels].findIndex(cell => /^school$/i.test(String(cell || '').trim()));
+        const areaIndex = grid[labels].findIndex(cell => /^learning area$/i.test(String(cell || '').trim()));
+        school = values[schoolIndex] || '';
+        learningArea = values[areaIndex] || '';
+      }
+      continue;
+    }
+
+    const header = grid[headerIndex].map(value => String(value || '').toLowerCase().replace(/[^a-z0-9. ]/g, ' ').replace(/\s+/g, ' ').trim());
+    const indexes = schemeColumns.map(column => header.findIndex(column.match));
+    rows = grid.slice(headerIndex + 1)
+      .filter(row => row.some(value => String(value || '').trim()))
+      .map(row => Object.fromEntries(schemeColumns.map((column, index) => [
+        column.key,
+        indexes[index] < 0 ? '' : String(row[indexes[index]] || '').trim(),
+      ])));
+    break;
+  }
+
+  return { school, learningArea, rows };
+};
+
+const createSchemeTable = (content, grade, term) => {
+  try {
+    const parsed = JSON.parse(content || '');
+    if (parsed?.format === 'scheme-table-v1' && Array.isArray(parsed.rows)) {
+      return {
+        format: 'scheme-table-v1',
+        school: typeof parsed.school === 'string' ? parsed.school : '',
+        year: typeof parsed.year === 'string' ? parsed.year : String(new Date().getFullYear()),
+        learningArea: typeof parsed.learningArea === 'string' ? parsed.learningArea : '',
+        rows: parsed.rows.map(row => Object.fromEntries(schemeColumns.map(column => [
+          column.key,
+          typeof row?.[column.key] === 'string' ? row[column.key] : '',
+        ]))),
+      };
+    }
+    if (Array.isArray(parsed?.ops)) {
+      const extractedText = parsed.ops.map(operation => typeof operation.insert === 'string' ? operation.insert : '').join('').trim();
+      return {
+        format: 'scheme-table-v1',
+        school: '',
+        year: String(new Date().getFullYear()),
+        learningArea: '',
+        grade,
+        term,
+        rows: extractedText ? [{ ...emptySchemeRow(), outcomes: extractedText }] : [emptySchemeRow()],
+      };
+    }
+  } catch {
+    if (content) {
+      return {
+        format: 'scheme-table-v1',
+        school: '',
+        year: String(new Date().getFullYear()),
+        learningArea: '',
+        grade,
+        term,
+        rows: [{ ...emptySchemeRow(), outcomes: content }],
+      };
+    }
+  }
+  return {
+    format: 'scheme-table-v1',
+    school: '',
+    year: String(new Date().getFullYear()),
+    learningArea: '',
+    grade,
+    term,
+    rows: [emptySchemeRow()],
+  };
+};
+
+const extractSchemeContent = async (filePath, grade, term) => {
+  const extension = path.extname(filePath).toLowerCase();
+  if (extension === '.docx') {
+    const result = await mammoth.convertToHtml({ path: filePath });
+    const parsedTable = parseSchemeDocumentHtml(result.value);
+    if (parsedTable.rows.length) {
+      return JSON.stringify({
+        format: 'scheme-table-v1',
+        ...parsedTable,
+        grade,
+        term,
+        year: String(new Date().getFullYear()),
+      });
+    }
+  }
+  const extractedText = await extractSchemeText(filePath);
+  const fallbackTable = createSchemeTable(JSON.stringify({ ops: [{ insert: `${extractedText}\n` }] }), grade, term);
+  return JSON.stringify(fallbackTable);
+};
+
+const getHomeworkFilePath = async documentPath => {
+  const filename = path.basename(String(documentPath || ''));
+  const privatePath = path.resolve('uploads/homework', filename);
+  try {
+    await fs.access(privatePath);
+    return privatePath;
+  } catch (err) {
+    if (err.code !== 'ENOENT') throw err;
+  }
+  const legacyPath = path.resolve('public/uploads/homework', filename);
+  await fs.access(legacyPath);
+  return legacyPath;
+};
 
 const examSubjectDefinitions = [
   { key: 'english', label: 'English' },
@@ -134,9 +352,10 @@ export default function registerExamRoutes(app) {
                 l.id AS learner_id, l.name, l.assessment_number, l.birth_certificate, l.class_teacher
          FROM learner_results lr
          JOIN learners l ON lr.learner_id = l.id
-         WHERE (LOWER(l.grade) = LOWER($1) OR LOWER(l.grade) = LOWER($3)) AND lr.term = $2
+         WHERE (LOWER(l.grade) = LOWER($1) OR LOWER(l.grade) = LOWER($3))
+           AND lr.term = $2 AND lr.teacher_id = $4
          ORDER BY l.name`,
-        [normalizedGrade, selectedTerm, `Grade ${normalizedGrade}`]
+        [normalizedGrade, selectedTerm, `Grade ${normalizedGrade}`, req.user.id]
       );
       learners = result.rows;
 
@@ -161,8 +380,9 @@ export default function registerExamRoutes(app) {
         `SELECT rs.learner_id, rs.subject_code, rs.subject_name, rs.final_mark, rs.pl, rs.points
          FROM learner_result_subjects rs
          JOIN learners l ON rs.learner_id = l.id
-         WHERE rs.term = $1 AND (LOWER(l.grade) = LOWER($2) OR LOWER(l.grade) = LOWER($3)) AND rs.learner_id = ANY($4)` ,
-        [selectedTerm, normalizedGrade, `Grade ${normalizedGrade}`, learnerIds]
+         WHERE rs.term = $1 AND (LOWER(l.grade) = LOWER($2) OR LOWER(l.grade) = LOWER($3))
+           AND rs.learner_id = ANY($4) AND rs.teacher_id = $5` ,
+        [selectedTerm, normalizedGrade, `Grade ${normalizedGrade}`, learnerIds, req.user.id]
       );
       subjectResult.rows.forEach(row => {
         const key = normalizeSubjectCode(row.subject_code || row.subject_name);
@@ -191,9 +411,9 @@ export default function registerExamRoutes(app) {
          FROM homework_submissions hs
          JOIN homework h ON hs.homework_id = h.id
          JOIN learners l ON hs.learner_id = l.id
-         WHERE h.grade = $1 AND h.term = $2
+         WHERE h.grade = $1 AND h.term = $2 AND h.teacher_id = $3
          ORDER BY hs.submitted_at DESC`,
-        [grade, selectedTerm]
+        [grade, selectedTerm, req.user.id]
       );
       submittedHomework = homeworkRows.rows.map(row => ({
         ...row,
@@ -209,6 +429,179 @@ export default function registerExamRoutes(app) {
       submittedHomework,
       subjectDefinitions,
     });
+  });
+
+  app.get('/exams/schemes', isAuthenticated, isTeacher, async (req, res) => {
+    const grade = String(req.query.grade || '').trim();
+    const selectedTerm = ["1", "2", "3"].includes(req.query.term) ? req.query.term : "1";
+    if (!/^[1-9]$/.test(grade)) return res.redirect('/exams');
+
+    try {
+      const result = await db.query(
+        `SELECT id, document_path, original_filename, content, updated_at
+         FROM teacher_schemes
+         WHERE teacher_id = $1 AND grade = $2 AND term = $3`,
+        [req.user.id, grade, selectedTerm]
+      );
+      const scheme = result.rows[0] || null;
+      let structuredContent = false;
+      if (scheme?.content) {
+        try {
+          structuredContent = JSON.parse(scheme.content)?.format === 'scheme-table-v1';
+        } catch {
+          structuredContent = false;
+        }
+      }
+      if (scheme && !structuredContent) {
+        const existingFilePath = path.resolve('uploads/schemes', path.basename(scheme.document_path));
+        try {
+          await fs.access(existingFilePath);
+          scheme.content = await extractSchemeContent(existingFilePath, grade, selectedTerm);
+        } catch (err) {
+          if (err.code !== 'ENOENT') throw err;
+          console.error('Scheme source file is missing; displaying saved text in the editable table.');
+          scheme.content = JSON.stringify(createSchemeTable(scheme.content, grade, selectedTerm));
+        }
+        await db.query(
+          `UPDATE teacher_schemes
+           SET content = $1
+           WHERE id = $2 AND teacher_id = $3`,
+          [scheme.content, scheme.id, req.user.id]
+        );
+      }
+      const schemeTable = createSchemeTable(scheme?.content, grade, selectedTerm);
+      res.render('examSchemes.ejs', {
+        selectedGrade: grade,
+        selectedTerm,
+        scheme,
+        schemeTable,
+        contentUnavailable: Boolean(scheme && !schemeTable.rows.some(row => Object.values(row).some(value => value.trim()))),
+        uploaded: req.query.uploaded === '1',
+        saved: req.query.saved === '1',
+        invalid: req.query.invalid === '1',
+      });
+    } catch (err) {
+      console.error('Failed to load scheme:', err);
+      res.status(500).render('error.ejs', { message: 'Error loading scheme' });
+    }
+  });
+
+  app.post('/exams/schemes', isAuthenticated, isTeacher, handleSchemeUpload, async (req, res) => {
+    const grade = String(req.body.grade || '').trim();
+    const term = String(req.body.term || '');
+    const pageUrl = `/exams/schemes?grade=${encodeURIComponent(grade)}&term=${encodeURIComponent(term)}`;
+
+    if (!/^[1-9]$/.test(grade) || !["1", "2", "3"].includes(term)) {
+      if (req.file) await fs.unlink(req.file.path).catch(err => console.error('Failed to remove invalid scheme upload:', err));
+      return res.redirect('/exams');
+    }
+    if (!req.file) return res.redirect(`${pageUrl}&invalid=1`);
+
+    const documentPath = path.posix.join('uploads/schemes', req.file.filename);
+    const originalFilename = path.basename(req.file.originalname).slice(0, 255);
+    try {
+      const content = await extractSchemeContent(req.file.path, grade, term);
+      const existingResult = await db.query(
+        `SELECT document_path
+         FROM teacher_schemes
+         WHERE teacher_id = $1 AND grade = $2 AND term = $3`,
+        [req.user.id, grade, term]
+      );
+      await db.query(
+        `INSERT INTO teacher_schemes (teacher_id, grade, term, document_path, original_filename, content)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (teacher_id, grade, term)
+         DO UPDATE SET document_path = EXCLUDED.document_path,
+                       original_filename = EXCLUDED.original_filename,
+                       content = EXCLUDED.content,
+                       updated_at = now()`,
+        [req.user.id, grade, term, documentPath, originalFilename, content]
+      );
+
+      const oldPath = existingResult.rows[0]?.document_path;
+      if (oldPath && oldPath !== documentPath) {
+        await fs.unlink(path.resolve('uploads/schemes', path.basename(oldPath))).catch(err => {
+          if (err.code !== 'ENOENT') console.error('Failed to remove replaced scheme file:', err);
+        });
+      }
+      return res.redirect(`${pageUrl}&uploaded=1`);
+    } catch (err) {
+      await fs.unlink(req.file.path).catch(cleanupError => console.error('Failed to remove unsuccessful scheme upload:', cleanupError));
+      console.error('Scheme upload error:', err);
+      return res.status(500).render('error.ejs', { message: 'Error uploading scheme' });
+    }
+  });
+
+  app.post('/exams/schemes/save', isAuthenticated, isTeacher, async (req, res) => {
+    const grade = String(req.body.grade || '').trim();
+    const term = String(req.body.term || '');
+    const pageUrl = `/exams/schemes?grade=${encodeURIComponent(grade)}&term=${encodeURIComponent(term)}`;
+    const content = String(req.body.content || '');
+
+    if (!/^[1-9]$/.test(grade) || !["1", "2", "3"].includes(term)) return res.redirect('/exams');
+    if (!content || content.length > 500000) return res.redirect(`${pageUrl}&invalid=1`);
+
+    let parsedContent;
+    try {
+      parsedContent = JSON.parse(content);
+    } catch {
+      return res.redirect(`${pageUrl}&invalid=1`);
+    }
+    const maxCellLength = 10000;
+    const validSchemeTable = parsedContent?.format === 'scheme-table-v1' &&
+      typeof parsedContent.school === 'string' &&
+      typeof parsedContent.year === 'string' &&
+      typeof parsedContent.learningArea === 'string' &&
+      parsedContent.school.length <= 150 &&
+      parsedContent.year.length <= 20 &&
+      parsedContent.learningArea.length <= 150 &&
+      Array.isArray(parsedContent.rows) &&
+      parsedContent.rows.length > 0 &&
+      parsedContent.rows.length <= 500 &&
+      parsedContent.rows.every(row =>
+        row && schemeColumns.every(column =>
+          typeof row[column.key] === 'string' && row[column.key].length <= maxCellLength
+        )
+      );
+    if (!validSchemeTable) {
+      return res.redirect(`${pageUrl}&invalid=1`);
+    }
+
+    try {
+      const result = await db.query(
+        `UPDATE teacher_schemes
+         SET content = $1, updated_at = now()
+         WHERE teacher_id = $2 AND grade = $3 AND term = $4
+         RETURNING id`,
+        [JSON.stringify({ ...parsedContent, grade, term }), req.user.id, grade, term]
+      );
+      if (!result.rowCount) return res.status(404).send('Upload a scheme before saving online edits.');
+      return res.redirect(`${pageUrl}&saved=1`);
+    } catch (err) {
+      console.error('Scheme save error:', err);
+      return res.status(500).render('error.ejs', { message: 'Error saving scheme edits' });
+    }
+  });
+
+  app.get('/exams/schemes/download', isAuthenticated, isTeacher, async (req, res) => {
+    const grade = String(req.query.grade || '').trim();
+    const term = String(req.query.term || '');
+    if (!/^[1-9]$/.test(grade) || !["1", "2", "3"].includes(term)) return res.status(404).send('Scheme not found.');
+
+    try {
+      const result = await db.query(
+        `SELECT document_path, original_filename
+         FROM teacher_schemes
+         WHERE teacher_id = $1 AND grade = $2 AND term = $3`,
+        [req.user.id, grade, term]
+      );
+      const scheme = result.rows[0];
+      if (!scheme) return res.status(404).send('Scheme not found.');
+      return res.download(path.resolve('uploads/schemes', path.basename(scheme.document_path)), scheme.original_filename);
+    } catch (err) {
+      console.error('Scheme download error:', err);
+      return res.status(500).send('Error downloading scheme.');
+    }
   });
 
   app.get('/exams/notes', isAuthenticated, isTeacher, async (req, res) => {
@@ -255,6 +648,7 @@ export default function registerExamRoutes(app) {
     };
     const formattedNotes = notes.map(formatNote);
     const editNote = formattedNotes.find(note => String(note.id) === String(req.query.edit_id)) || null;
+    if (req.query.edit_id && !editNote) return res.redirect('/login');
 
     res.render('examNotes.ejs', {
       selectedGrade: grade,
@@ -321,7 +715,7 @@ export default function registerExamRoutes(app) {
          RETURNING id`,
         [subject.subject_code, subject.name, title, JSON.stringify(parsedContent), weekNo, lessonNo, strand, subStrand, noteId, req.user.id, grade, selectedTerm]
       );
-      if (!result.rowCount) return res.status(404).send('Note not found.');
+      if (!result.rowCount) return res.redirect('/login');
       return res.redirect(`${pageUrl}&updated=1`);
     }
 
@@ -335,7 +729,7 @@ export default function registerExamRoutes(app) {
   });
 
   app.post('/exams/notes/:id/delete', isAuthenticated, isTeacher, async (req, res) => {
-    if (!/^\d+$/.test(String(req.params.id))) return res.status(404).send('Note not found.');
+    if (!/^\d+$/.test(String(req.params.id))) return res.redirect('/login');
     const result = await db.query(
       `DELETE FROM teacher_notes
        WHERE id = $1 AND teacher_id = $2
@@ -343,13 +737,13 @@ export default function registerExamRoutes(app) {
       [req.params.id, req.user.id]
     );
     const note = result.rows[0];
-    if (!note) return res.status(404).send('Note not found.');
+    if (!note) return res.redirect('/login');
     const pageUrl = `/exams/notes?grade=${encodeURIComponent(note.grade)}&term=${encodeURIComponent(note.term)}&subject_code=${encodeURIComponent(note.subject_code)}`;
     res.redirect(`${pageUrl}&deleted=1`);
   });
 
   app.get('/exams/notes/:id/download', isAuthenticated, isTeacher, async (req, res) => {
-    if (!/^\d+$/.test(String(req.params.id))) return res.status(404).send('Note not found.');
+    if (!/^\d+$/.test(String(req.params.id))) return res.redirect('/login');
     const result = await db.query(
       `SELECT id, grade, term, subject_name, content, week_no, lesson_no, strand, sub_strand
        FROM teacher_notes
@@ -357,7 +751,7 @@ export default function registerExamRoutes(app) {
       [req.params.id, req.user.id]
     );
     const note = result.rows[0];
-    if (!note) return res.status(404).send('Note not found.');
+    if (!note) return res.redirect('/login');
 
     const subjectSlug = String(note.subject_name || 'learning-area')
       .replace(/[^a-z0-9]+/gi, '-')
@@ -401,6 +795,8 @@ export default function registerExamRoutes(app) {
       )
       : { rows: [] };
     const editNote = noteResult.rows.find(note => String(note.id) === String(req.query.edit_id)) || null;
+    if (req.query.edit_id && !editNote) return res.redirect('/login');
+    if (req.query.edit_id && !editNote) return res.redirect('/login');
 
     res.render('examLearningAreas.ejs', {
       selectedGrade: grade,
@@ -474,7 +870,7 @@ export default function registerExamRoutes(app) {
          RETURNING id`,
         [subject.subject_code, subject.name, strand, subStrand, weekNo, lessonNo, JSON.stringify(parsedContent), schoolName, roll, lessonTime, lessonNoteId, req.user.id, grade, selectedTerm]
       );
-      if (!updateResult.rowCount) return res.status(404).send('Lesson plan not found.');
+      if (!updateResult.rowCount) return res.redirect('/login');
       return res.redirect(`${pageUrl}&updated=1`);
     }
 
@@ -492,7 +888,7 @@ export default function registerExamRoutes(app) {
   });
 
   app.post('/exams/lesson-notes/:id/delete', isAuthenticated, isTeacher, async (req, res) => {
-    if (!/^\d+$/.test(String(req.params.id))) return res.status(404).send('Lesson plan not found.');
+    if (!/^\d+$/.test(String(req.params.id))) return res.redirect('/login');
     const result = await db.query(
       `DELETE FROM lesson_notes
        WHERE id = $1 AND teacher_id = $2
@@ -500,12 +896,13 @@ export default function registerExamRoutes(app) {
       [req.params.id, req.user.id]
     );
     const note = result.rows[0];
-    if (!note) return res.status(404).send('Lesson plan not found.');
+    if (!note) return res.redirect('/login');
     const pageUrl = `/exams/learning-areas?grade=${encodeURIComponent(note.grade)}&term=${encodeURIComponent(note.term)}&subject_code=${encodeURIComponent(note.subject_code)}`;
     res.redirect(`${pageUrl}&deleted=1`);
   });
 
   app.get('/exams/lesson-notes/:id/download', isAuthenticated, isTeacher, async (req, res) => {
+    if (!/^\d+$/.test(String(req.params.id))) return res.redirect('/login');
     const result = await db.query(
       `SELECT id, grade, term, subject_name, strand, sub_strand, week_no, lesson_no, lesson_content,
               school_name, roll, TO_CHAR(lesson_time, 'HH24:MI') AS lesson_time
@@ -514,7 +911,7 @@ export default function registerExamRoutes(app) {
       [req.params.id, req.user.id]
     );
     const note = result.rows[0];
-    if (!note) return res.status(404).send('Lesson notes not found.');
+    if (!note) return res.redirect('/login');
 
     res.setHeader('Content-Type', 'application/msword; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${lessonNoteFilename(note)}"`);
@@ -542,10 +939,10 @@ export default function registerExamRoutes(app) {
                 lr.creative_arts, lr.creative_arts_pl, lr.creative_arts_points, lr.creative_arts_cat1, lr.creative_arts_cat2, lr.creative_arts_main,
                 lr.evrg, lr.evrg_pl, lr.evrg_points
          FROM learners l
-         LEFT JOIN learner_results lr ON lr.learner_id = l.id AND lr.term = $2
+         LEFT JOIN learner_results lr ON lr.learner_id = l.id AND lr.term = $2 AND lr.teacher_id = $4
          WHERE LOWER(l.grade) = LOWER($1) OR LOWER(l.grade) = LOWER($3)
          ORDER BY l.name`,
-        [normalizedGrade, selectedTerm, `Grade ${normalizedGrade}`]
+        [normalizedGrade, selectedTerm, `Grade ${normalizedGrade}`, req.user.id]
       );
     } else {
       result = await db.query(
@@ -561,9 +958,9 @@ export default function registerExamRoutes(app) {
                 lr.creative_arts, lr.creative_arts_pl, lr.creative_arts_points, lr.creative_arts_cat1, lr.creative_arts_cat2, lr.creative_arts_main,
                 lr.evrg, lr.evrg_pl, lr.evrg_points
          FROM learners l
-         LEFT JOIN learner_results lr ON lr.learner_id = l.id AND lr.term = $1
+         LEFT JOIN learner_results lr ON lr.learner_id = l.id AND lr.term = $1 AND lr.teacher_id = $2
          ORDER BY l.grade, l.name`,
-        [selectedTerm]
+        [selectedTerm, req.user.id]
       );
     }
     const learnerIds = result.rows.map(row => row.id);
@@ -573,8 +970,8 @@ export default function registerExamRoutes(app) {
         `SELECT learner_id, subject_code, subject_name, cat1, cat2, main,
                 ee, ae, me, be, strand, sub_strand, reflection
          FROM learner_result_subjects
-         WHERE term = $1 AND learner_id = ANY($2)`,
-        [selectedTerm, learnerIds]
+         WHERE term = $1 AND learner_id = ANY($2) AND teacher_id = $3`,
+        [selectedTerm, learnerIds, req.user.id]
       );
       subjectResult.rows.forEach(row => {
         const code = normalizeSubjectCode(row.subject_code || row.subject_name || '');
@@ -647,14 +1044,14 @@ export default function registerExamRoutes(app) {
       if (activeSubjects.length > 0) {
         await db.query(
           `DELETE FROM learner_result_subjects
-           WHERE learner_id = $1 AND term = $2 AND subject_code <> ALL($3::text[])`,
-          [learner_id, selectedTerm, activeSubjects],
+           WHERE learner_id = $1 AND term = $2 AND teacher_id = $3 AND subject_code <> ALL($4::text[])`,
+          [learner_id, selectedTerm, req.user.id, activeSubjects],
         );
       } else {
         await db.query(
           `DELETE FROM learner_result_subjects
-           WHERE learner_id = $1 AND term = $2`,
-          [learner_id, selectedTerm],
+           WHERE learner_id = $1 AND term = $2 AND teacher_id = $3`,
+          [learner_id, selectedTerm, req.user.id],
         );
       }
     }
@@ -679,8 +1076,8 @@ export default function registerExamRoutes(app) {
     let existingTermResult = {};
     try {
       const r = await db.query(
-        'SELECT * FROM learner_results WHERE learner_id = $1 AND term = $2 LIMIT 1',
-        [learner_id, selectedTerm]
+        'SELECT * FROM learner_results WHERE learner_id = $1 AND term = $2 AND teacher_id = $3 LIMIT 1',
+        [learner_id, selectedTerm, req.user.id]
       );
       existingTermResult = r.rows[0] || {};
     } catch (err) {
@@ -738,7 +1135,7 @@ export default function registerExamRoutes(app) {
     try {
       await db.query(
         `INSERT INTO learner_results (
-          learner_id, term,
+          learner_id, term, teacher_id,
           english_cat1, english_cat2, english_main, english, english_pl, english_points,
           kiswahili_cat1, kiswahili_cat2, kiswahili_main, kiswahili, kiswahili_pl, kiswahili_points,
           mathematics_cat1, mathematics_cat2, mathematics_main, mathematics, mathematics_pl, mathematics_points,
@@ -750,19 +1147,19 @@ export default function registerExamRoutes(app) {
           creative_arts_cat1, creative_arts_cat2, creative_arts_main, creative_arts, creative_arts_pl, creative_arts_points,
           evrg, evrg_pl, evrg_points
         ) VALUES (
-          $1, $2,
-          $3, $4, $5, $6, $7, $8,
-          $9, $10, $11, $12, $13, $14,
-          $15, $16, $17, $18, $19, $20,
-          $21, $22, $23, $24, $25, $26,
-          $27, $28, $29, $30, $31, $32,
-          $33, $34, $35, $36, $37, $38,
-          $39, $40, $41, $42, $43, $44,
-          $45, $46, $47, $48, $49, $50,
-          $51, $52, $53, $54, $55, $56,
-          $57, $58, $59
+          $1, $2, $3,
+          $4, $5, $6, $7, $8, $9,
+          $10, $11, $12, $13, $14, $15,
+          $16, $17, $18, $19, $20, $21,
+          $22, $23, $24, $25, $26, $27,
+          $28, $29, $30, $31, $32, $33,
+          $34, $35, $36, $37, $38, $39,
+          $40, $41, $42, $43, $44, $45,
+          $46, $47, $48, $49, $50, $51,
+          $52, $53, $54, $55, $56, $57,
+          $58, $59, $60
         )
-        ON CONFLICT (learner_id, term) DO UPDATE SET
+        ON CONFLICT (learner_id, term, teacher_id) DO UPDATE SET
           english_cat1 = EXCLUDED.english_cat1,
           english_cat2 = EXCLUDED.english_cat2,
           english_main = EXCLUDED.english_main,
@@ -822,7 +1219,7 @@ export default function registerExamRoutes(app) {
           evrg_points = EXCLUDED.evrg_points
         `,
         [
-          learner_id, selectedTerm,
+          learner_id, selectedTerm, req.user.id,
           g.english_cat1, g.english_cat2, g.english_main, g.english, g.english_pl, g.english_points,
           g.kiswahili_cat1, g.kiswahili_cat2, g.kiswahili_main, g.kiswahili, g.kiswahili_pl, g.kiswahili_points,
           g.mathematics_cat1, g.mathematics_cat2, g.mathematics_main, g.mathematics, g.mathematics_pl, g.mathematics_points,
@@ -889,11 +1286,11 @@ export default function registerExamRoutes(app) {
 
         await db.query(
           `INSERT INTO learner_result_subjects (
-            learner_id, term, subject_code, subject_name,
+            learner_id, term, teacher_id, subject_code, subject_name,
             cat1, cat2, main, final_mark, pl, points,
             ee, ae, me, be, strand, sub_strand, lesson_title, reflection
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
-          ON CONFLICT (learner_id, term, subject_code) DO UPDATE SET
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+          ON CONFLICT (learner_id, term, subject_code, teacher_id) DO UPDATE SET
             subject_name = EXCLUDED.subject_name,
             cat1 = EXCLUDED.cat1,
             cat2 = EXCLUDED.cat2,
@@ -912,7 +1309,7 @@ export default function registerExamRoutes(app) {
             updated_at = NOW()
           `,
           [
-            learner_id, selectedTerm, subject, subjectName,
+            learner_id, selectedTerm, req.user.id, subject, subjectName,
             cat1 !== null ? String(cat1) : null,
             cat2 !== null ? String(cat2) : null,
             main !== null ? String(main) : null,
@@ -941,11 +1338,11 @@ export default function registerExamRoutes(app) {
       `SELECT lr.*, l.name, l.assessment_number, l.birth_certificate, l.grade AS learner_grade, l.class_teacher
        FROM learner_results lr
        JOIN learners l ON lr.learner_id = l.id
-       WHERE lr.id = $1`,
-      [id]
+       WHERE lr.id = $1 AND lr.teacher_id = $2`,
+      [id, req.user.id]
     );
     if (result.rows.length === 0) {
-      return res.status(404).render('error.ejs', { message: 'Result not found' });
+      return res.redirect('/login');
     }
     const exam = result.rows[0];
     const selectedGrade = grade || exam.learner_grade;
@@ -1011,7 +1408,7 @@ export default function registerExamRoutes(app) {
     const { pl: evrg_pl, points: evrg_points } = getGradeAndPoints(evrg);
 
     try {
-      await db.query(
+      const updateResult = await db.query(
         `UPDATE learner_results SET
           english_cat1=$1, english_cat2=$2, english_main=$3, english=$4, english_pl=$5, english_points=$6,
           kiswahili_cat1=$7, kiswahili_cat2=$8, kiswahili_main=$9, kiswahili=$10, kiswahili_pl=$11, kiswahili_points=$12,
@@ -1023,7 +1420,7 @@ export default function registerExamRoutes(app) {
           pre_technical_cat1=$43, pre_technical_cat2=$44, pre_technical_main=$45, pre_technical=$46, pre_technical_pl=$47, pre_technical_points=$48,
           creative_arts_cat1=$49, creative_arts_cat2=$50, creative_arts_main=$51, creative_arts=$52, creative_arts_pl=$53, creative_arts_points=$54,
           evrg=$55, evrg_pl=$56, evrg_points=$57
-        WHERE id=$58`,
+        WHERE id=$58 AND teacher_id=$59`,
         [
           english_cat1, english_cat2, english_main, english, english_pl, english_points,
           kiswahili_cat1, kiswahili_cat2, kiswahili_main, kiswahili, kiswahili_pl, kiswahili_points,
@@ -1035,9 +1432,11 @@ export default function registerExamRoutes(app) {
           pre_technical_cat1, pre_technical_cat2, pre_technical_main, pre_technical, pre_technical_pl, pre_technical_points,
           creative_arts_cat1, creative_arts_cat2, creative_arts_main, creative_arts, creative_arts_pl, creative_arts_points,
           evrg, evrg_pl, evrg_points,
-          id
+          id,
+          req.user.id
         ]
       );
+      if (!updateResult.rowCount) return res.redirect('/login');
       const redirectGrade = grade || req.query.grade;
       const redirectTerm = term ? `&term=${term}` : '';
       res.redirect(redirectGrade ? `/exams?grade=${redirectGrade}${redirectTerm}` : `/exams${redirectTerm}`);
@@ -1052,7 +1451,16 @@ export default function registerExamRoutes(app) {
     const { id } = req.params;
     const { grade, term } = req.body;
     try {
-      await db.query('DELETE FROM learner_results WHERE id=$1', [id]);
+      const result = await db.query(
+        'DELETE FROM learner_results WHERE id=$1 AND teacher_id=$2 RETURNING learner_id, term',
+        [id, req.user.id]
+      );
+      const ownedResult = result.rows[0];
+      if (!ownedResult) return res.redirect('/login');
+      await db.query(
+        'DELETE FROM learner_result_subjects WHERE learner_id=$1 AND term=$2 AND teacher_id=$3',
+        [ownedResult.learner_id, ownedResult.term, req.user.id]
+      );
       const redirectTarget = grade ? `/exams?grade=${grade}${term ? `&term=${term}` : ''}` : '/exams';
       res.redirect(redirectTarget);
     } catch (err) {
@@ -1078,10 +1486,11 @@ export default function registerExamRoutes(app) {
        FROM learner_result_subjects rs
        JOIN learners l ON rs.learner_id = l.id
        WHERE rs.term = $1
+         AND rs.teacher_id = $4
          AND BTRIM(rs.subject_code) ~ '^9(0[1-9]|1[0-2])$'
          AND (LOWER(l.grade) = LOWER($2) OR LOWER(l.grade) = LOWER($3))
        ORDER BY rs.subject_code, rs.subject_name ASC`,
-      [selectedTerm, normalizedGrade, `Grade ${normalizedGrade}`]
+      [selectedTerm, normalizedGrade, `Grade ${normalizedGrade}`, req.user.id]
     );
 
     const subjectDefinitions = activeSubjectsResult.rows.length > 0
@@ -1097,9 +1506,10 @@ export default function registerExamRoutes(app) {
         `SELECT DISTINCT l.id AS learner_id, l.name, l.assessment_number, l.grade AS learner_grade, rs.term
          FROM learners l
          JOIN learner_result_subjects rs ON rs.learner_id = l.id
-         WHERE rs.term = $1 AND (LOWER(l.grade) = LOWER($2) OR LOWER(l.grade) = LOWER($3))
+         WHERE rs.term = $1 AND rs.teacher_id = $4
+           AND (LOWER(l.grade) = LOWER($2) OR LOWER(l.grade) = LOWER($3))
          ORDER BY l.name`,
-        [selectedTerm, normalizedGrade, `Grade ${normalizedGrade}`]
+        [selectedTerm, normalizedGrade, `Grade ${normalizedGrade}`, req.user.id]
       );
     }
 
@@ -1108,9 +1518,10 @@ export default function registerExamRoutes(app) {
         `SELECT lr.id, lr.learner_id, lr.term, lr.evrg, lr.evrg_pl, lr.evrg_points, l.name, l.assessment_number, l.grade AS learner_grade
          FROM learner_results lr
          JOIN learners l ON lr.learner_id = l.id
-         WHERE (LOWER(l.grade) = LOWER($1) OR LOWER(l.grade) = LOWER($3)) AND lr.term = $2
+         WHERE (LOWER(l.grade) = LOWER($1) OR LOWER(l.grade) = LOWER($3))
+           AND lr.term = $2 AND lr.teacher_id = $4
          ORDER BY l.name`,
-        [normalizedGrade, selectedTerm, `Grade ${normalizedGrade}`]
+        [normalizedGrade, selectedTerm, `Grade ${normalizedGrade}`, req.user.id]
       );
     }
 
@@ -1122,10 +1533,11 @@ export default function registerExamRoutes(app) {
          FROM learner_result_subjects rs
          JOIN learners l ON rs.learner_id = l.id
          WHERE rs.term = $1
+           AND rs.teacher_id = $5
            AND BTRIM(rs.subject_code) ~ '^9(0[1-9]|1[0-2])$'
            AND (LOWER(l.grade) = LOWER($2) OR LOWER(l.grade) = LOWER($3))
            AND rs.learner_id = ANY($4)`,
-        [selectedTerm, normalizedGrade, `Grade ${normalizedGrade}`, learnerIds]
+        [selectedTerm, normalizedGrade, `Grade ${normalizedGrade}`, learnerIds, req.user.id]
       );
       subjectResult.rows.forEach(row => {
         const key = normalizeSubjectCode(row.subject_code || row.subject_name);
@@ -1284,11 +1696,11 @@ export default function registerExamRoutes(app) {
       `SELECT DISTINCT ON (rs.subject_code) rs.subject_code, rs.subject_name
        FROM learner_result_subjects rs
        JOIN learners l ON rs.learner_id = l.id
-       WHERE rs.term = $1
+       WHERE rs.term = $1 AND rs.teacher_id = $4
          AND BTRIM(rs.subject_code) ~ '^9(0[1-9]|1[0-2])$'
          AND (LOWER(l.grade) = LOWER($2) OR LOWER(l.grade) = LOWER($3))
        ORDER BY rs.subject_code, rs.subject_name ASC`,
-      [selectedTerm, normalizedGrade, `Grade ${normalizedGrade}`]
+      [selectedTerm, normalizedGrade, `Grade ${normalizedGrade}`, req.user.id]
     );
 
     const subjectDefinitions = Array.from(activeSubjectsResult.rows.reduce((definitions, row) => {
@@ -1308,9 +1720,10 @@ export default function registerExamRoutes(app) {
       `SELECT lr.id, lr.learner_id, lr.term, lr.evrg, lr.evrg_pl, lr.evrg_points, l.name, l.assessment_number, l.grade AS learner_grade, l.birth_certificate, l.class_teacher
        FROM learner_results lr
        JOIN learners l ON lr.learner_id = l.id
-       WHERE (LOWER(l.grade) = LOWER($1) OR LOWER(l.grade) = LOWER($3)) AND lr.term = $2
+       WHERE (LOWER(l.grade) = LOWER($1) OR LOWER(l.grade) = LOWER($3))
+         AND lr.term = $2 AND lr.teacher_id = $4
        ORDER BY l.name`,
-      [normalizedGrade, selectedTerm, `Grade ${normalizedGrade}`]
+      [normalizedGrade, selectedTerm, `Grade ${normalizedGrade}`, req.user.id]
     );
 
     if (result.rows.length === 0) {
@@ -1324,11 +1737,11 @@ export default function registerExamRoutes(app) {
         `SELECT rs.learner_id, rs.subject_code, rs.subject_name, rs.final_mark, rs.pl, rs.points
          FROM learner_result_subjects rs
          JOIN learners l ON rs.learner_id = l.id
-         WHERE rs.term = $1
+         WHERE rs.term = $1 AND rs.teacher_id = $5
            AND BTRIM(rs.subject_code) ~ '^9(0[1-9]|1[0-2])$'
            AND (LOWER(l.grade) = LOWER($2) OR LOWER(l.grade) = LOWER($3))
            AND rs.learner_id = ANY($4)`,
-        [selectedTerm, normalizedGrade, `Grade ${normalizedGrade}`, learnerIds]
+        [selectedTerm, normalizedGrade, `Grade ${normalizedGrade}`, learnerIds, req.user.id]
       );
       subjectResult.rows.forEach(row => {
         const key = normalizeSubjectCode(getCanonicalSubjectCode(row.subject_code || row.subject_name));
@@ -1656,9 +2069,10 @@ export default function registerExamRoutes(app) {
         `SELECT DISTINCT l.id AS learner_id, l.name, l.grade, l.assessment_number, l.birth_cert_no, l.birth_certificate, l.class_teacher
          FROM learners l
          JOIN learner_result_subjects rs ON rs.learner_id = l.id
-         WHERE rs.term = $1 AND (LOWER(l.grade) = LOWER($2) OR LOWER(l.grade) = LOWER($3))
+         WHERE rs.term = $1 AND rs.teacher_id = $4
+           AND (LOWER(l.grade) = LOWER($2) OR LOWER(l.grade) = LOWER($3))
          ORDER BY l.name`,
-        [selectedTerm, normalizedGrade, `Grade ${normalizedGrade}`]
+        [selectedTerm, normalizedGrade, `Grade ${normalizedGrade}`, req.user.id]
       );
     }
 
@@ -1667,9 +2081,10 @@ export default function registerExamRoutes(app) {
         `SELECT lr.id, lr.learner_id, lr.evrg, lr.evrg_pl, lr.evrg_points, l.name, l.grade, l.assessment_number, l.birth_cert_no, l.birth_certificate, l.class_teacher
          FROM learner_results lr
          JOIN learners l ON lr.learner_id = l.id
-         WHERE (LOWER(l.grade) = LOWER($1) OR LOWER(l.grade) = LOWER($3)) AND lr.term = $2
+         WHERE (LOWER(l.grade) = LOWER($1) OR LOWER(l.grade) = LOWER($3))
+           AND lr.term = $2 AND lr.teacher_id = $4
          ORDER BY l.name`,
-        [normalizedGrade, selectedTerm, `Grade ${normalizedGrade}`]
+        [normalizedGrade, selectedTerm, `Grade ${normalizedGrade}`, req.user.id]
       );
     }
 
@@ -1684,8 +2099,9 @@ export default function registerExamRoutes(app) {
         `SELECT rs.learner_id, rs.subject_code, rs.subject_name, rs.final_mark, rs.pl, rs.points
          FROM learner_result_subjects rs
          JOIN learners l ON rs.learner_id = l.id
-         WHERE rs.term = $1 AND (LOWER(l.grade) = LOWER($2) OR LOWER(l.grade) = LOWER($3)) AND rs.learner_id = ANY($4)`,
-        [selectedTerm, normalizedGrade, `Grade ${normalizedGrade}`, learnerIds]
+         WHERE rs.term = $1 AND rs.teacher_id = $5
+           AND (LOWER(l.grade) = LOWER($2) OR LOWER(l.grade) = LOWER($3)) AND rs.learner_id = ANY($4)`,
+        [selectedTerm, normalizedGrade, `Grade ${normalizedGrade}`, learnerIds, req.user.id]
       );
 
       subjectResult.rows.forEach(row => {
@@ -2133,6 +2549,45 @@ export default function registerExamRoutes(app) {
     }
   });
 
+  app.get('/exams/homework/:homeworkId/document', isAuthenticated, isTeacher, async (req, res) => {
+    if (!/^\d+$/.test(String(req.params.homeworkId))) return res.redirect('/login');
+    try {
+      const result = await db.query(
+        `SELECT document_path
+         FROM homework
+         WHERE id = $1 AND teacher_id = $2`,
+        [req.params.homeworkId, req.user.id]
+      );
+      const homework = result.rows[0];
+      if (!homework?.document_path) return res.redirect('/login');
+      const filePath = await getHomeworkFilePath(homework.document_path);
+      return res.download(filePath);
+    } catch (err) {
+      console.error('Homework document download error:', err);
+      return res.status(500).render('error.ejs', { message: 'Error downloading homework document' });
+    }
+  });
+
+  app.get('/exams/homework/submissions/:submissionId/document', isAuthenticated, isTeacher, async (req, res) => {
+    if (!/^\d+$/.test(String(req.params.submissionId))) return res.redirect('/login');
+    try {
+      const result = await db.query(
+        `SELECT hs.answer_document_path
+         FROM homework_submissions hs
+         JOIN homework h ON h.id = hs.homework_id
+         WHERE hs.id = $1 AND h.teacher_id = $2`,
+        [req.params.submissionId, req.user.id]
+      );
+      const submission = result.rows[0];
+      if (!submission?.answer_document_path) return res.redirect('/login');
+      const filePath = await getHomeworkFilePath(submission.answer_document_path);
+      return res.download(filePath);
+    } catch (err) {
+      console.error('Homework answer download error:', err);
+      return res.status(500).render('error.ejs', { message: 'Error downloading homework answer' });
+    }
+  });
+
   app.get('/exams/homework/submissions', isAuthenticated, isTeacher, async (req, res) => {
     try {
       const { grade, term } = req.query;
@@ -2148,14 +2603,17 @@ export default function registerExamRoutes(app) {
         JOIN users u ON h.teacher_id = u.id
       `;
 
-      let queryText = baseQuery + ' ORDER BY hs.submitted_at DESC';
-      let queryParams = [];
+      let queryText = baseQuery + ' WHERE h.teacher_id = $1 ORDER BY hs.submitted_at DESC';
+      let queryParams = [req.user.id];
       if (grade && selectedTerm) {
-        queryText = baseQuery + ' WHERE h.grade = $1 AND h.term = $2 ORDER BY hs.submitted_at DESC';
-        queryParams = [grade, selectedTerm];
+        queryText = baseQuery + ' WHERE h.teacher_id = $1 AND h.grade = $2 AND h.term = $3 ORDER BY hs.submitted_at DESC';
+        queryParams = [req.user.id, grade, selectedTerm];
       } else if (grade) {
-        queryText = baseQuery + ' WHERE h.grade = $1 ORDER BY hs.submitted_at DESC';
-        queryParams = [grade];
+        queryText = baseQuery + ' WHERE h.teacher_id = $1 AND h.grade = $2 ORDER BY hs.submitted_at DESC';
+        queryParams = [req.user.id, grade];
+      } else if (selectedTerm) {
+        queryText = baseQuery + ' WHERE h.teacher_id = $1 AND h.term = $2 ORDER BY hs.submitted_at DESC';
+        queryParams = [req.user.id, selectedTerm];
       }
 
       const subjectDefinitions = await getSubjectDefinitionsFromDb();
@@ -2187,13 +2645,13 @@ export default function registerExamRoutes(app) {
          JOIN homework h ON hs.homework_id = h.id
          JOIN learners l ON hs.learner_id = l.id
          JOIN users u ON h.teacher_id = u.id
-         WHERE hs.id = $1
+         WHERE hs.id = $1 AND h.teacher_id = $2
          LIMIT 1`,
-        [submissionId]
+        [submissionId, req.user.id]
       );
 
       if (result.rows.length === 0) {
-        return res.render('error.ejs', { message: 'Submission not found.' });
+        return res.redirect('/login');
       }
 
       const subjectDefinitions = await getSubjectDefinitionsFromDb();
@@ -2220,16 +2678,22 @@ export default function registerExamRoutes(app) {
         return res.render('error.ejs', { message: 'Score must be a number between 0 and 100.' });
       }
 
-      await db.query(
+      const updatedSubmission = await db.query(
         `UPDATE homework_submissions
          SET teacher_score = $1,
              teacher_feedback = $2,
              feedback_at = now()
-         WHERE id = $3`,
-        [score, teacher_feedback || null, submissionId]
+         WHERE id = $3
+           AND EXISTS (
+             SELECT 1 FROM homework h
+             WHERE h.id = homework_submissions.homework_id AND h.teacher_id = $4
+           )
+         RETURNING id`,
+        [score, teacher_feedback || null, submissionId, req.user.id]
       );
+      if (!updatedSubmission.rowCount) return res.redirect('/login');
 
-      const submissions = await db.query(`SELECT h.grade FROM homework_submissions hs JOIN homework h ON hs.homework_id = h.id WHERE hs.id = $1 LIMIT 1`, [submissionId]);
+      const submissions = await db.query(`SELECT h.grade FROM homework_submissions hs JOIN homework h ON hs.homework_id = h.id WHERE hs.id = $1 AND h.teacher_id = $2 LIMIT 1`, [submissionId, req.user.id]);
       const grade = submissions.rows[0]?.grade;
       res.redirect(`/exams/homework/submissions${grade ? `?grade=${grade}` : ''}`);
     } catch (err) {

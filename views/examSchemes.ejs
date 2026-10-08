@@ -1,0 +1,226 @@
+<%- include('partials/header') %>
+
+<main class="container py-4 py-md-5">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+    <div>
+      <a href="/exams?grade=<%= selectedGrade %>&term=<%= selectedTerm %>" class="btn btn-sm btn-outline-secondary mb-3">
+        <i class="fas fa-arrow-left me-1"></i>Back to exam results
+      </a>
+      <h1 class="h4 mb-1">Schemes — Grade <%= selectedGrade %></h1>
+      <p class="text-muted mb-0">Upload and manage the scheme of work for each term.</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      <div class="dropdown">
+        <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" id="schemesGradeDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+          Grade <%= selectedGrade %>
+        </button>
+        <ul class="dropdown-menu" aria-labelledby="schemesGradeDropdown">
+          <% for (let grade = 1; grade <= 9; grade++) { %>
+            <li><a class="dropdown-item <%= Number(selectedGrade) === grade ? 'active' : '' %>" href="/exams/schemes?grade=<%= grade %>&term=<%= selectedTerm %>">Grade <%= grade %></a></li>
+          <% } %>
+        </ul>
+      </div>
+      <div class="dropdown">
+        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="schemesTermDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+          Term <%= selectedTerm %>
+        </button>
+        <ul class="dropdown-menu" aria-labelledby="schemesTermDropdown">
+          <% for (let term = 1; term <= 3; term++) { %>
+            <li><a class="dropdown-item <%= selectedTerm === String(term) ? 'active' : '' %>" href="/exams/schemes?grade=<%= selectedGrade %>&term=<%= term %>">Term <%= term %></a></li>
+          <% } %>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <section class="card border-0 shadow-sm">
+    <div class="card-body p-3 p-md-4">
+      <h2 class="h5 mb-3">Grade <%= selectedGrade %> — Term <%= selectedTerm %></h2>
+
+      <% if (uploaded) { %>
+        <div class="alert alert-success py-2" role="status">Scheme uploaded successfully.</div>
+      <% } %>
+      <% if (saved) { %>
+        <div class="alert alert-success py-2" role="status">Online scheme edits saved.</div>
+      <% } %>
+      <% if (invalid) { %>
+        <div class="alert alert-danger py-2" role="alert">Check the scheme details and table entries, then try again.</div>
+      <% } %>
+
+      <% if (scheme) { %>
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 border rounded p-3 mb-4">
+          <div class="text-break">
+            <div class="fw-semibold"><%= scheme.original_filename %></div>
+            <small class="text-muted">Last updated <%= new Date(scheme.updated_at).toLocaleString() %></small>
+          </div>
+          <a href="/exams/schemes/download?grade=<%= selectedGrade %>&term=<%= selectedTerm %>" class="btn btn-sm btn-outline-primary text-nowrap">
+            <i class="fas fa-download me-1"></i>Download
+          </a>
+        </div>
+      <% } else { %>
+        <p class="text-muted">No scheme has been uploaded for this term yet.</p>
+      <% } %>
+
+      <form action="/exams/schemes" method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="grade" value="<%= selectedGrade %>">
+        <input type="hidden" name="term" value="<%= selectedTerm %>">
+        <div class="mb-3">
+          <label for="schemeDocument" class="form-label fw-semibold"><%= scheme ? 'Replace scheme file' : 'Upload scheme file' %></label>
+          <input id="schemeDocument" type="file" name="document" class="form-control" accept=".pdf,.doc,.docx" required>
+          <div class="form-text">Accepted formats: PDF, DOC, DOCX. Maximum file size: 10 MB.</div>
+        </div>
+        <button type="submit" class="btn btn-primary">
+          <i class="fas fa-upload me-1"></i><%= scheme ? 'Replace scheme' : 'Upload scheme' %>
+        </button>
+      </form>
+
+      <% if (scheme) { %>
+        <hr class="my-4">
+        <h3 class="h5 mb-1">Read and edit scheme online</h3>
+        <p class="small text-muted mb-3">Edit the scheme in the table below and save your changes online. The uploaded original remains available to download.</p>
+        <% if (contentUnavailable) { %>
+          <div class="alert alert-warning py-2" role="status">No selectable text could be extracted from this document. You can enter the scheme details in the table below. Scanned pages may need to be transcribed manually.</div>
+        <% } %>
+        <form action="/exams/schemes/save" method="POST" id="schemeEditForm">
+          <input type="hidden" name="grade" value="<%= selectedGrade %>">
+          <input type="hidden" name="term" value="<%= selectedTerm %>">
+          <input type="hidden" name="content" id="schemeContentInput">
+          <div class="text-center mb-3">
+            <div class="fw-bold">SCHEME OF WORK</div>
+            <label for="schemeYear" class="visually-hidden">Year</label>
+            <input id="schemeYear" class="form-control form-control-sm fw-semibold text-center mx-auto" style="max-width: 10rem" value="<%= schemeTable.year %>" maxlength="20">
+          </div>
+
+          <div class="table-responsive mb-3">
+            <table class="table table-sm table-bordered align-middle text-center mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th scope="col">SCHOOL</th>
+                  <th scope="col">GRADE</th>
+                  <th scope="col">TERM</th>
+                  <th scope="col">LEARNING AREA</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><input class="form-control form-control-sm text-center" data-meta="school" value="<%= schemeTable.school %>" maxlength="150" aria-label="School"></td>
+                  <td class="fw-semibold">GRADE <%= selectedGrade %></td>
+                  <td class="fw-semibold"><%= selectedTerm %></td>
+                  <td><input class="form-control form-control-sm text-center" data-meta="learningArea" value="<%= schemeTable.learningArea %>" maxlength="150" aria-label="Learning area"></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="table-responsive border rounded">
+            <table class="table table-sm table-bordered align-middle mb-0" style="min-width: 1500px">
+              <thead class="table-light">
+                <tr>
+                  <th scope="col" style="min-width: 55px">WK</th>
+                  <th scope="col" style="min-width: 65px">LSN</th>
+                  <th scope="col" style="min-width: 150px">Strand</th>
+                  <th scope="col" style="min-width: 150px">Sub-strand</th>
+                  <th scope="col" style="min-width: 210px">Specific Learning Outcomes</th>
+                  <th scope="col" style="min-width: 210px">Learning Experience</th>
+                  <th scope="col" style="min-width: 170px">Key Inquiry Questions</th>
+                  <th scope="col" style="min-width: 170px">Learning Resources</th>
+                  <th scope="col" style="min-width: 170px">Assessment Methods</th>
+                  <th scope="col" style="min-width: 150px">Reflection</th>
+                  <th scope="col" style="min-width: 90px">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="schemeRows">
+                <% schemeTable.rows.forEach((row, index) => { %>
+                  <tr>
+                    <td><textarea class="form-control form-control-sm" data-field="week" rows="3" aria-label="Week <%= index + 1 %>"><%= row.week %></textarea></td>
+                    <td><textarea class="form-control form-control-sm" data-field="lesson" rows="3" aria-label="Lesson <%= index + 1 %>"><%= row.lesson %></textarea></td>
+                    <td><textarea class="form-control form-control-sm" data-field="strand" rows="4" aria-label="Strand <%= index + 1 %>"><%= row.strand %></textarea></td>
+                    <td><textarea class="form-control form-control-sm" data-field="subStrand" rows="4" aria-label="Sub-strand <%= index + 1 %>"><%= row.subStrand %></textarea></td>
+                    <td><textarea class="form-control form-control-sm" data-field="outcomes" rows="5" aria-label="Specific learning outcomes <%= index + 1 %>"><%= row.outcomes %></textarea></td>
+                    <td><textarea class="form-control form-control-sm" data-field="experience" rows="5" aria-label="Learning experience <%= index + 1 %>"><%= row.experience %></textarea></td>
+                    <td><textarea class="form-control form-control-sm" data-field="inquiry" rows="5" aria-label="Key inquiry questions <%= index + 1 %>"><%= row.inquiry %></textarea></td>
+                    <td><textarea class="form-control form-control-sm" data-field="resources" rows="5" aria-label="Learning resources <%= index + 1 %>"><%= row.resources %></textarea></td>
+                    <td><textarea class="form-control form-control-sm" data-field="assessment" rows="5" aria-label="Assessment methods <%= index + 1 %>"><%= row.assessment %></textarea></td>
+                    <td><textarea class="form-control form-control-sm" data-field="reflection" rows="5" aria-label="Reflection <%= index + 1 %>"><%= row.reflection %></textarea></td>
+                    <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger remove-scheme-row" aria-label="Remove row <%= index + 1 %>">Remove</button></td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+          <div id="schemeSaveError" class="alert alert-danger py-2 mt-3 d-none" role="alert">The table contains too much text to save. Shorten the entries and try again.</div>
+          <div class="d-flex flex-wrap justify-content-between gap-2 mt-3">
+            <button type="button" id="addSchemeRow" class="btn btn-outline-primary">
+              <i class="fas fa-plus me-1"></i>Add lesson row
+            </button>
+            <button type="submit" class="btn btn-success">
+            <i class="fas fa-save me-1"></i>Save online
+          </button>
+          </div>
+        </form>
+      <% } %>
+    </div>
+  </section>
+</main>
+
+<script>
+  const schemeRows = document.getElementById('schemeRows');
+  if (schemeRows) {
+    const fields = ['week', 'lesson', 'strand', 'subStrand', 'outcomes', 'experience', 'inquiry', 'resources', 'assessment', 'reflection'];
+    const labels = ['Week', 'Lesson', 'Strand', 'Sub-strand', 'Specific learning outcomes', 'Learning experience', 'Key inquiry questions', 'Learning resources', 'Assessment methods', 'Reflection'];
+
+    const createRow = () => {
+      const row = document.createElement('tr');
+      fields.forEach((field, index) => {
+        const cell = document.createElement('td');
+        const input = document.createElement('textarea');
+        input.className = 'form-control form-control-sm';
+        input.dataset.field = field;
+        input.rows = index < 2 ? 3 : 5;
+        input.setAttribute('aria-label', labels[index]);
+        cell.appendChild(input);
+        row.appendChild(cell);
+      });
+      const actions = document.createElement('td');
+      actions.className = 'text-center';
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'btn btn-sm btn-outline-danger remove-scheme-row';
+      remove.textContent = 'Remove';
+      remove.setAttribute('aria-label', 'Remove lesson row');
+      actions.appendChild(remove);
+      row.appendChild(actions);
+      return row;
+    };
+
+    document.getElementById('addSchemeRow').addEventListener('click', () => {
+      schemeRows.appendChild(createRow());
+    });
+
+    schemeRows.addEventListener('click', event => {
+      const removeButton = event.target.closest('.remove-scheme-row');
+      if (removeButton && schemeRows.rows.length > 1) removeButton.closest('tr').remove();
+    });
+
+    document.getElementById('schemeEditForm').addEventListener('submit', event => {
+      const rows = Array.from(schemeRows.rows, row =>
+        Object.fromEntries(fields.map(field => [field, row.querySelector(`[data-field="${field}"]`).value]))
+      );
+      const content = JSON.stringify({
+        format: 'scheme-table-v1',
+        school: document.querySelector('[data-meta="school"]').value,
+        year: document.getElementById('schemeYear').value,
+        learningArea: document.querySelector('[data-meta="learningArea"]').value,
+        rows,
+      });
+      if (content.length > 500000) {
+        event.preventDefault();
+        document.getElementById('schemeSaveError').classList.remove('d-none');
+        return;
+      }
+      document.getElementById('schemeContentInput').value = content;
+    });
+  }
+</script>
+
+<%- include('partials/footer') %>

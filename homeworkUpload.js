@@ -2,7 +2,7 @@ import fs from "fs";
 import multer from "multer";
 import path from "path";
 
-const uploadDir = path.resolve("public/uploads/homework");
+const uploadDir = path.resolve("uploads/homework");
 fs.mkdirSync(uploadDir, { recursive: true });
 
 const storage = multer.diskStorage({

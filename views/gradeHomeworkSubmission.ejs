@@ -35,7 +35,7 @@
                 <dt class="col-sm-5 text-muted">Answer</dt>
                 <dd class="col-sm-7">
                   <% if (submission.answer_document_path) { %>
-                    <a href="/<%= submission.answer_document_path %>" class="btn btn-sm btn-outline-primary" download>
+                    <a href="/exams/homework/submissions/<%= submission.submission_id %>/document" class="btn btn-sm btn-outline-primary">
                       <i class="fas fa-download me-1"></i>Download Answer
                     </a>
                   <% } else { %>

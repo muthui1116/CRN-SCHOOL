@@ -126,6 +126,26 @@ const connectDatabase = async () => {
     `);
 
     await db.query(`
+      CREATE TABLE IF NOT EXISTS teacher_schemes (
+        id SERIAL PRIMARY KEY,
+        teacher_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        grade VARCHAR(2) NOT NULL,
+        term VARCHAR(2) NOT NULL,
+        document_path VARCHAR(255) NOT NULL,
+        original_filename VARCHAR(255) NOT NULL,
+        content TEXT NOT NULL DEFAULT '',
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        UNIQUE (teacher_id, grade, term)
+      )
+    `);
+
+    await db.query(`
+      ALTER TABLE teacher_schemes
+      ADD COLUMN IF NOT EXISTS content TEXT NOT NULL DEFAULT ''
+    `);
+
+    await db.query(`
       CREATE TABLE IF NOT EXISTS lesson_notes (
         id SERIAL PRIMARY KEY,
         teacher_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -187,6 +207,7 @@ const connectDatabase = async () => {
       CREATE TABLE IF NOT EXISTS learner_results (
         id SERIAL PRIMARY KEY,
         learner_id INTEGER NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
+        teacher_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
         term VARCHAR(2) NOT NULL,
         english VARCHAR(50),
         english_pl VARCHAR(100),
@@ -244,15 +265,30 @@ const connectDatabase = async () => {
         creative_arts_main VARCHAR(50),
         evrg VARCHAR(100),
         evrg_pl VARCHAR(100),
-        evrg_points VARCHAR(100),
-        UNIQUE (learner_id, term)
+        evrg_points VARCHAR(100)
       )
+    `);
+
+    await db.query(`
+      ALTER TABLE learner_results
+      ADD COLUMN IF NOT EXISTS teacher_id INTEGER REFERENCES users(id) ON DELETE CASCADE
+    `);
+
+    await db.query(`
+      ALTER TABLE learner_results
+      DROP CONSTRAINT IF EXISTS learner_results_learner_id_term_key
+    `);
+
+    await db.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS learner_results_learner_term_teacher_key
+      ON learner_results (learner_id, term, teacher_id)
     `);
 
     await db.query(`
       CREATE TABLE IF NOT EXISTS learner_result_subjects (
         id SERIAL PRIMARY KEY,
         learner_id INTEGER NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
+        teacher_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
         term VARCHAR(2) NOT NULL,
         subject_code VARCHAR(100) NOT NULL,
         subject_name VARCHAR(100),
@@ -271,9 +307,23 @@ const connectDatabase = async () => {
         lesson_title VARCHAR(255),
         reflection TEXT,
         date_created TIMESTAMPTZ NOT NULL DEFAULT now(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-        UNIQUE (learner_id, term, subject_code)
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
       )
+    `);
+
+    await db.query(`
+      ALTER TABLE learner_result_subjects
+      ADD COLUMN IF NOT EXISTS teacher_id INTEGER REFERENCES users(id) ON DELETE CASCADE
+    `);
+
+    await db.query(`
+      ALTER TABLE learner_result_subjects
+      DROP CONSTRAINT IF EXISTS learner_result_subjects_learner_id_term_subject_code_key
+    `);
+
+    await db.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS learner_result_subjects_learner_term_subject_teacher_key
+      ON learner_result_subjects (learner_id, term, subject_code, teacher_id)
     `);
 
     await db.query(`

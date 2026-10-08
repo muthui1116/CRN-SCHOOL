@@ -1,4 +1,5 @@
 import db from "../db.js";
+import fs from "fs/promises";
 import path from "path";
 import homeworkUpload from "../homeworkUpload.js";
 import { lessonNoteDocumentHtml, lessonNoteFilename, lessonNoteContentHtml } from "../utils/lessonNoteDocument.js";
@@ -127,6 +128,20 @@ function isLearner(req, res, next) {
   return res.status(403).send("Access denied. Learner privileges required.");
 }
 
+const getHomeworkFilePath = async documentPath => {
+  const filename = path.basename(String(documentPath || ''));
+  const privatePath = path.resolve('uploads/homework', filename);
+  try {
+    await fs.access(privatePath);
+    return privatePath;
+  } catch (err) {
+    if (err.code !== 'ENOENT') throw err;
+  }
+  const legacyPath = path.resolve('public/uploads/homework', filename);
+  await fs.access(legacyPath);
+  return legacyPath;
+};
+
 export default function registerLearnerRoutes(app) {
   app.get("/learner", isAuthenticated, isLearner, async (req, res) => {
     try {
@@ -187,6 +202,7 @@ export default function registerLearnerRoutes(app) {
              FROM learner_results lr
              JOIN learners l ON lr.learner_id = l.id
              WHERE lr.learner_id = $1 AND lr.term = $2
+             ORDER BY lr.id DESC
              LIMIT 1`,
             [learnerId, selectedTerm],
           );
@@ -194,9 +210,10 @@ export default function registerLearnerRoutes(app) {
 
           subjectDefinitions = summativeSubjectFallbacks;
           const continuousMarks = await db.query(
-            `SELECT subject_code, subject_name, final_mark, pl, points
+            `SELECT DISTINCT ON (subject_code) subject_code, subject_name, final_mark, pl, points
              FROM learner_result_subjects
-             WHERE learner_id = $1 AND term = $2`,
+             WHERE learner_id = $1 AND term = $2
+             ORDER BY subject_code, updated_at DESC, id DESC`,
             [learnerId, selectedTerm],
           );
           const continuousMarkMap = {};
@@ -225,12 +242,12 @@ export default function registerLearnerRoutes(app) {
           });
         } else {
           const subjectResult = await db.query(
-            `SELECT rs.subject_code, rs.subject_name, rs.final_mark, rs.pl, rs.points,
+            `SELECT DISTINCT ON (rs.subject_code) rs.subject_code, rs.subject_name, rs.final_mark, rs.pl, rs.points,
                     rs.ee, rs.ae, rs.me, rs.be, rs.reflection,
                     rs.strand, rs.sub_strand, rs.lesson_title
              FROM learner_result_subjects rs
              WHERE rs.term = $1 AND rs.learner_id = $2
-             ORDER BY rs.subject_name ASC`,
+             ORDER BY rs.subject_code, rs.updated_at DESC, rs.id DESC`,
             [selectedTerm, learnerId],
           );
 
@@ -374,6 +391,58 @@ export default function registerLearnerRoutes(app) {
     } catch (err) {
       console.error("Lesson note download error:", err.message);
       res.status(500).send("Unable to download lesson notes.");
+    }
+  });
+
+  app.get("/learner/homework/:id/document", isAuthenticated, isLearner, async (req, res) => {
+    try {
+      const userResult = await db.query(
+        "SELECT id, name, grade, assessment_number FROM users WHERE id = $1",
+        [req.user.id]
+      );
+      const grade = await resolveLearnerGrade(userResult.rows[0] || {});
+      if (!grade || !/^\d+$/.test(String(req.params.id))) return res.redirect("/login");
+      const homeworkResult = await db.query(
+        `SELECT document_path
+         FROM homework
+         WHERE id = $1 AND (LOWER(grade) = LOWER($2) OR LOWER(grade) = LOWER($3))`,
+        [req.params.id, grade, `Grade ${grade}`]
+      );
+      const homework = homeworkResult.rows[0];
+      if (!homework?.document_path) return res.redirect("/login");
+      const filePath = await getHomeworkFilePath(homework.document_path);
+      return res.download(filePath);
+    } catch (err) {
+      console.error("Homework document download error:", err.message);
+      return res.status(500).render("error.ejs", { message: "Unable to download homework document." });
+    }
+  });
+
+  app.get("/learner/homework/:id/answer-document", isAuthenticated, isLearner, async (req, res) => {
+    try {
+      const userResult = await db.query(
+        "SELECT id, name, grade, assessment_number FROM users WHERE id = $1",
+        [req.user.id]
+      );
+      const userProfile = userResult.rows[0] || {};
+      const grade = await resolveLearnerGrade(userProfile);
+      const learnerId = await resolveLearnerId(userProfile);
+      if (!grade || !learnerId || !/^\d+$/.test(String(req.params.id))) return res.redirect("/login");
+      const submissionResult = await db.query(
+        `SELECT hs.answer_document_path
+         FROM homework_submissions hs
+         JOIN homework h ON h.id = hs.homework_id
+         WHERE hs.homework_id = $1 AND hs.learner_id = $2
+           AND (LOWER(h.grade) = LOWER($3) OR LOWER(h.grade) = LOWER($4))`,
+        [req.params.id, learnerId, grade, `Grade ${grade}`]
+      );
+      const submission = submissionResult.rows[0];
+      if (!submission?.answer_document_path) return res.redirect("/login");
+      const filePath = await getHomeworkFilePath(submission.answer_document_path);
+      return res.download(filePath);
+    } catch (err) {
+      console.error("Homework answer download error:", err.message);
+      return res.status(500).render("error.ejs", { message: "Unable to download homework answer." });
     }
   });
 

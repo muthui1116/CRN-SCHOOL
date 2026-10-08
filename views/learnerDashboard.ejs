@@ -293,7 +293,7 @@
                       </div>
                       <div class="text-end d-grid gap-2 d-md-flex justify-content-end">
                         <% if (hw.document_path) { %>
-                          <a href="/<%= hw.document_path %>" class="btn btn-sm btn-outline-secondary mb-2 w-100 w-md-auto" download>
+                          <a href="/learner/homework/<%= hw.id %>/document" class="btn btn-sm btn-outline-secondary mb-2 w-100 w-md-auto">
                             <i class="fas fa-download me-1"></i>Download
                           </a>
                         <% } %>
@@ -338,5 +338,4 @@
     background-color: rgba(13, 110, 253, 0.1);
   }
 </style>
-
 

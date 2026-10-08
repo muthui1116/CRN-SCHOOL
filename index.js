@@ -19,9 +19,8 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
 app.use(limiter);
 
 app.use(session({
@@ -40,7 +39,8 @@ registerProfileRoutes(app);
 registerLearnerRoutes(app);
 registerExamRoutes(app);
 
-
+app.use('/uploads/homework', (req, res) => res.redirect('/login'));
+app.use(express.static(path.join(__dirname, 'public')));
 
 app.listen(port, () => {
   console.log(`Server running on port ${port}.`);
