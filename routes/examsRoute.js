@@ -1624,6 +1624,103 @@ export default function registerExamRoutes(app) {
       'POS'
     ];
 
+    if (req.query.format === 'print') {
+      const subjectColumnWidth = subjKeys.length
+        ? `${60 / (subjKeys.length * 2)}%`
+        : '0%';
+      const subjectHeaders = subjectDefinitions.map(subject => `
+        <th colspan="2">${escapeHtml(getShortSubjectLabel(subject.label))}</th>
+      `).join('');
+      const tableRows = learners.map(learner => `
+        <tr>
+          <td class="name">${escapeHtml(learner.name || 'N/A')}</td>
+          <td>${escapeHtml(learner.assessment_number || '—')}</td>
+          <td>${escapeHtml(learner.learner_grade || grade)}</td>
+          ${subjKeys.map(key => {
+            const subjectRow = learner.subjectRows[key] || {};
+            const mark = subjectRow.mark !== null && subjectRow.mark !== undefined
+              ? subjectRow.mark
+              : '—';
+            return `<td>${escapeHtml(mark)}</td><td>${escapeHtml(subjectRow.pl || '—')}</td>`;
+          }).join('')}
+          <td>${escapeHtml(learner.avrg ?? '—')}</td>
+          <td>${escapeHtml(learner.avrg_pl || '—')}</td>
+          <td>${escapeHtml(learner.pos ?? '—')}</td>
+        </tr>
+      `).join('');
+
+      const printHtml = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Exam results - Grade ${escapeHtml(normalizedGrade)}, Term ${escapeHtml(selectedTerm)}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 16px; color: #111; font: 10px Arial, sans-serif; }
+    .toolbar { margin-bottom: 12px; }
+    button { padding: 7px 14px; cursor: pointer; }
+    h1 { margin: 0 0 4px; font-size: 16px; text-align: center; }
+    .subtitle { margin: 0 0 12px; text-align: center; }
+    table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+    th, td {
+      border: 1px solid #555;
+      padding: 3px 2px;
+      text-align: center;
+      overflow-wrap: anywhere;
+    }
+    th { background: #e9ecef; font-weight: 700; }
+    tbody tr:nth-child(even) { background: #f5f5f5; }
+    .name { text-align: left; }
+    @page { size: A4 landscape; margin: 6mm; }
+    @media print {
+      body { padding: 0; font-size: 7pt; print-color-adjust: exact; }
+      .toolbar { display: none; }
+      h1 { font-size: 11pt; }
+      .subtitle { margin-bottom: 6px; }
+      th, td { padding: 2px 1px; }
+      thead { display: table-header-group; }
+      tr { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar"><button type="button" onclick="window.print()">Print / Save as PDF</button></div>
+  <h1>Exam Results — Grade ${escapeHtml(normalizedGrade)}</h1>
+  <p class="subtitle">Term ${escapeHtml(selectedTerm)} · ${learners.length} learner(s)</p>
+  <table>
+    <colgroup>
+      <col style="width:18%">
+      <col style="width:7%">
+      <col style="width:5%">
+      ${subjKeys.map(() => `<col style="width:${subjectColumnWidth}"><col style="width:${subjectColumnWidth}">`).join('')}
+      <col style="width:3.34%">
+      <col style="width:3.33%">
+      <col style="width:3.33%">
+    </colgroup>
+    <thead>
+      <tr>
+        <th rowspan="2">Learner</th>
+        <th rowspan="2">Assessment #</th>
+        <th rowspan="2">Grade</th>
+        ${subjectHeaders}
+        <th rowspan="2">Average</th>
+        <th rowspan="2">PL</th>
+        <th rowspan="2">Pos</th>
+      </tr>
+      <tr>
+        ${subjectDefinitions.map(() => '<th>Mark</th><th>PL</th>').join('')}
+      </tr>
+    </thead>
+    <tbody>
+      ${tableRows || `<tr><td colspan="${headers.length}">No results found for Grade ${escapeHtml(normalizedGrade)}.</td></tr>`}
+    </tbody>
+  </table>
+</body>
+</html>`;
+      return res.type('html').send(printHtml);
+    }
+
     const escapeCsv = value => {
       if (value === null || value === undefined) return '';
       const str = String(value);

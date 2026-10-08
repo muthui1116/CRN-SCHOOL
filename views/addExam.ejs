@@ -18,7 +18,7 @@
 
         <div class="row gx-3 mb-4">
           <div class="col-12 col-lg-6">
-            <label class="form-label fw-semibold">Grade</label>
+            <label class="form-label fw-semibold" for="gradeSelect">Grade</label>
             <select id="gradeSelect" class="form-select form-select-sm" required>
               <% for (let i = 1; i <= 9; i++) { %>
                 <option value="<%= i %>" <%= String(grade || 1) === String(i) ? 'selected' : '' %>>Grade <%= i %></option>
@@ -135,7 +135,9 @@
             <table class="table table-bordered mb-0 align-middle">
               <thead class="table-secondary">
                 <tr>
-                  <th class="fw-semibold">Learning Area</th>
+                  <th class="fw-semibold text-nowrap">Grade</th>
+                  <th class="fw-semibold text-nowrap">Learner</th>
+                  <th class="fw-semibold">Learning Areas</th>
                   <th class="text-center fw-semibold">CAT1</th>
                   <th class="text-center fw-semibold">CAT2</th>
                   <th class="text-center fw-semibold">Main</th>
@@ -145,6 +147,8 @@
               <tbody>
                 <% examSubjects.forEach(subject => { %>
                   <tr class="subject-row" data-subject="<%= subject.key %>">
+                    <td class="fw-semibold text-nowrap grade-cell">—</td>
+                    <td class="fw-semibold text-nowrap learner-name-cell">—</td>
                     <td class="fw-semibold">
                       <span><%= subject.label %></span>
                     </td>
@@ -318,6 +322,17 @@
           const scoreCat2 = cat2 || 0;
           const scoreMain = main || 0;
           return Math.round((scoreCat1 / 100 * 15) + (scoreCat2 / 100 * 15) + (scoreMain / 100 * 70));
+        };
+
+        const syncTableContext = () => {
+          const selectedGrade = gradeSelect?.value || gradeValue;
+          const learner = learnersData.find(l => String(l.id) === String(learnerSelect?.value));
+          document.querySelectorAll('.grade-cell').forEach(cell => {
+            cell.textContent = selectedGrade ? `Grade ${selectedGrade}` : '—';
+          });
+          document.querySelectorAll('.learner-name-cell').forEach(cell => {
+            cell.textContent = learner ? learner.name : '—';
+          });
         };
 
         const getStateKey = (learnerId = null) => {
@@ -533,6 +548,7 @@
 
         const populateLearnerScores = learnerId => {
           const learner = learnersData.find(l => String(l.id) === String(learnerId) || String(l.learner_id) === String(learnerId));
+          syncTableContext();
           restoreDynamicEntryState({});
           subjectKeys().forEach(subject => {
             const row = document.querySelector(`.subject-row[data-subject="${subject}"]`);
@@ -1132,6 +1148,7 @@
         });
 
         const restored = loadFormState();
+        syncTableContext();
         if (!restored && learnerSelect) {
           if (learnerSelect.value) {
             populateLearnerScores(learnerSelect.value);
@@ -1199,6 +1216,7 @@
           updateSubjectOptions();
           updateSubjectState(false);
           updateFinal();
+          syncTableContext();
           saveFormState();
         };
 
@@ -1220,4 +1238,3 @@
 </div>
 
 <%- include('partials/footer') %>
-
