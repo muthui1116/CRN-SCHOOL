@@ -1649,6 +1649,32 @@ export default function registerExamRoutes(app) {
         </tr>
       `).join('');
 
+      const averageMarks = subjKeys.map(key => {
+        const values = learners.map(learner => Number(learner.subjectRows?.[key]?.mark)).filter(Number.isFinite);
+        if (!values.length) return null;
+        const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+        return Number(mean.toFixed(2));
+      });
+      const overallAverage = learners.map(learner => Number(learner.avrg)).filter(Number.isFinite);
+      const overallMean = overallAverage.length
+        ? Number((overallAverage.reduce((sum, value) => sum + value, 0) / overallAverage.length).toFixed(2))
+        : null;
+      const averageRow = learners.length ? `
+        <tr class="average-row" style="font-weight: 700; background: #f8f9fa;">
+          <td class="name">Average</td>
+          <td>—</td>
+          <td>—</td>
+          ${subjKeys.map((key, index) => {
+            const avg = averageMarks[index];
+            const avgPl = avg !== null ? getGradeAndPoints(avg).pl : '—';
+            return `<td>${avg !== null ? escapeHtml(avg) : '—'}</td><td>${escapeHtml(avgPl)}</td>`;
+          }).join('')}
+          <td>${overallMean !== null ? escapeHtml(overallMean) : '—'}</td>
+          <td>${overallMean !== null ? escapeHtml(getGradeAndPoints(overallMean).pl) : '—'}</td>
+          <td>—</td>
+        </tr>
+      ` : '';
+
       const printHtml = `<!doctype html>
 <html lang="en">
 <head>
@@ -1672,6 +1698,7 @@ export default function registerExamRoutes(app) {
     th { background: #e9ecef; font-weight: 700; }
     tbody tr:nth-child(even) { background: #f5f5f5; }
     .name { text-align: left; }
+    .average-row td { font-weight: 700; }
     @page { size: A4 landscape; margin: 6mm; }
     @media print {
       body { padding: 0; font-size: 7pt; print-color-adjust: exact; }
@@ -1714,6 +1741,7 @@ export default function registerExamRoutes(app) {
     </thead>
     <tbody>
       ${tableRows || `<tr><td colspan="${headers.length}">No results found for Grade ${escapeHtml(normalizedGrade)}.</td></tr>`}
+      ${averageRow}
     </tbody>
   </table>
 </body>
@@ -1764,13 +1792,13 @@ export default function registerExamRoutes(app) {
     averageCols.push('');
     averageCols.push('');
     for (const key of subjKeys) {
-      const avg = subjectTotals[key].count > 0 ? (subjectTotals[key].sum / subjectTotals[key].count) : null;
-      averageCols.push(avg !== null ? Number(avg.toFixed(2)) : '');
-      averageCols.push('');
+      const avg = subjectTotals[key].count > 0 ? Number((subjectTotals[key].sum / subjectTotals[key].count).toFixed(2)) : null;
+      averageCols.push(avg !== null ? avg : '');
+      averageCols.push(avg !== null ? getGradeAndPoints(avg).pl : '');
     }
-    const overallAvg = avrgCount > 0 ? Number((avrgTotal / avrgCount).toFixed(2)) : '';
-    averageCols.push(overallAvg);
-    averageCols.push('');
+    const overallAvg = avrgCount > 0 ? Number((avrgTotal / avrgCount).toFixed(2)) : null;
+    averageCols.push(overallAvg !== null ? overallAvg : '');
+    averageCols.push(overallAvg !== null ? getGradeAndPoints(overallAvg).pl : '');
     averageCols.push('');
 
     csv += averageCols.map(escapeCsv).join(',') + '\n';
