@@ -1661,7 +1661,7 @@ export default function registerExamRoutes(app) {
         : null;
       const averageRow = learners.length ? `
         <tr class="average-row" style="font-weight: 700; background: #f8f9fa;">
-          <td class="name">Average</td>
+          <td class="name">Learning Area Mean</td>
           <td>—</td>
           <td>—</td>
           ${subjKeys.map((key, index) => {
@@ -1731,7 +1731,7 @@ export default function registerExamRoutes(app) {
         <th rowspan="2">Assessment #</th>
         <th rowspan="2">Grade</th>
         ${subjectHeaders}
-        <th rowspan="2">Average</th>
+        <th rowspan="2">Learning Area Mean</th>
         <th rowspan="2">PL</th>
         <th rowspan="2">Pos</th>
       </tr>
@@ -1788,7 +1788,7 @@ export default function registerExamRoutes(app) {
     });
 
     const averageCols = [];
-    averageCols.push('Average');
+    averageCols.push('Learning Area Mean');
     averageCols.push('');
     averageCols.push('');
     for (const key of subjKeys) {
